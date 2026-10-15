@@ -7,6 +7,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   const args = [...argv];
   const parsed: ParsedArgs = {
     command: null,
+    commandArgs: [],
     configPath: null,
     help: false,
     version: false,
@@ -18,8 +19,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
     createBranch: null,
     baseBranch: null,
     push: null,
+    mr: null,
+    targetBranch: null,
+    refreshProtected: false,
+    descriptionFile: null,
   };
-  const validCommands = ['setup'];
+  const validCommands = ['setup', 'config', 'protected', 'mr'];
 
   while (args.length) {
     const raw = args.shift();
@@ -50,6 +55,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       parsed.ticket = takeValue();
     } else if (current === '-d' || current === '--description') {
       parsed.description = takeValue();
+    } else if (current === '-F' || current === '--description-file') {
+      parsed.descriptionFile = takeValue();
     } else if (current === '-b' || current === '--branch' || current === '--switch') {
       parsed.switchBranch = takeValue();
     } else if (current === '--create-branch' || current === '--create') {
@@ -60,12 +67,22 @@ export function parseArgs(argv: string[]): ParsedArgs {
       parsed.push = true;
     } else if (current === '--no-push') {
       parsed.push = false;
+    } else if (current === '--mr') {
+      parsed.mr = true;
+    } else if (current === '--no-mr') {
+      parsed.mr = false;
+    } else if (current === '--target') {
+      parsed.targetBranch = takeValue();
+    } else if (current === '--refresh-protected' || current === '--refresh') {
+      parsed.refreshProtected = true;
     } else if (current.startsWith('-')) {
       printError(`Unknown option: '${current}'`);
       parsed.help = true;
     } else if (!parsed.command) {
       // First bare token (no leading dash) is treated as the command.
       parsed.command = current;
+    } else {
+      parsed.commandArgs.push(current);
     }
   }
 
@@ -76,7 +93,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   // --message / --ticket have no meaning interactively, so they imply headless intent.
-  if (parsed.message || parsed.ticket) {
+  if (parsed.message || parsed.ticket || parsed.descriptionFile) {
     parsed.headless = true;
   }
 
@@ -95,7 +112,12 @@ Usage:
 
 Commands:
   setup               Start the interactive setup wizard
-                      (configure Jira credentials and branch rules)
+                      (configure Jira, GitLab and branch rules)
+  config <action>     Non-interactive config: list | get <key> | set <key> <value>
+                      | unset <key> | path   (dotted keys, e.g. gitlab.autoCreateMr)
+  protected           Show protected branches for this repo (--refresh re-detects)
+  mr                  Create a GitLab merge request for the current pushed branch
+                      (--target <branch>)
   (default)           Run the commit workflow
 
 Options:
@@ -108,12 +130,21 @@ Headless mode (no prompts — for CI, scripts, and git hooks):
   -t, --ticket <KEY>   Use an existing Jira issue (e.g., PROJ-123)
   -m, --message <text> Create a new Jira issue with this summary, or set a
                        custom message when combined with --ticket
-  -d, --description    Description for the new Jira issue (defaults to message)
+  -d, --description    Detailed description: commit body, Jira description (new
+                       issues) and merge request description. Markdown allowed.
+  -F, --description-file <path>
+                       Read the description from a file ('-' for stdin)
   -b, --branch <name>  Switch to an existing branch before committing
   --create-branch <n>  Create a new branch (requires --base)
   --base <name>        Base branch for --create-branch
   --push               Push to remote after committing
   --no-push            Do not push (default in headless mode)
+  --mr / --no-mr       Create a GitLab merge request (implies --push); defaults
+                       to gitlab.autoCreateMr when the branch is pushed
+  --target <branch>    Merge request target branch
+  --refresh-protected  Re-detect protected branches from GitLab before committing
+
+  Committing on a protected branch moves the work to <prefix>/<branch> first.
 
   Passing --ticket or --message turns on headless mode automatically.
 
@@ -126,11 +157,13 @@ Headless examples:
   jcommit -m "fix login redirect" --push     Create an issue from the message, commit, push
   jcommit -t PROJ-123 -m "custom message"    Existing issue with a custom commit message
   jcommit -m "add cache" --create-branch feat/cache --base main
+  jcommit -t PROJ-123 -m "Add date range filter to Data Table" -F notes.md --mr
 
 The tool will help you:
   • Create or switch branches
   • Fetch or Create Jira ticket
-  • Commit and push your work seamlessly
+  • Avoid protected branches by moving work to <prefix>/<branch>
+  • Commit, push and open a GitLab merge request seamlessly
 
 Note: Run inside a Git-initialized repository.
 `);

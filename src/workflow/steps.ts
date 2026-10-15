@@ -1,7 +1,5 @@
-import { GjCommitConfig } from '../types';
 import { printError, printInfo, printSuccess } from '../utils/colors';
 import { runGit, getCurrentBranch } from '../utils/git';
-import { getDefaultProtectedBranches } from '../config/config';
 
 /**
  * Shared, non-interactive workflow steps used by both the interactive and the
@@ -34,27 +32,32 @@ export function assertStagedChanges(): void {
   }
 }
 
-export function resolveProtectedBranches(config: GjCommitConfig): string[] {
-  return Array.isArray(config.protectedBranches) && config.protectedBranches.length
-    ? config.protectedBranches
-    : getDefaultProtectedBranches();
-}
-
-export function assertNotProtected(branch: string, config: GjCommitConfig): void {
-  if (resolveProtectedBranches(config).includes(branch)) {
-    printError(`Operation cancelled. '${branch}' is protected.`);
-    process.exit(1);
+/**
+ * Builds the full commit message: the `KEY | title` subject line, then the
+ * structured description as the body (skipped when it only repeats the title).
+ */
+export function buildCommitMessage(subject: string, body?: string | null): string {
+  const trimmedBody = (body || '').trim();
+  const title = subject.replace(/^[A-Za-z]+-[0-9]+ \| /, '').trim();
+  if (!trimmedBody || trimmedBody === title) {
+    return subject;
   }
+  return `${subject}\n\n${trimmedBody}`;
 }
 
 export function commitChanges(commitMessage: string): void {
   printInfo('Committing...');
-  const commitResult = runGit(['commit', '-m', commitMessage], { stdio: 'inherit' });
+  // Pass the message on stdin so multi-line markdown bodies survive intact;
+  // `whitespace` cleanup keeps `## Heading` lines that `strip` would drop.
+  const commitResult = runGit(['commit', '--cleanup=whitespace', '-F', '-'], {
+    input: commitMessage,
+    stdio: ['pipe', 'inherit', 'inherit'],
+  });
   if (commitResult.status !== 0) {
     printError('Git commit failed');
     process.exit(1);
   }
-  printSuccess(`Git commit successful with message: ${commitMessage}`);
+  printSuccess(`Git commit successful with message: ${commitMessage.split('\n')[0]}`);
 }
 
 export function pushCurrentBranch(): void {

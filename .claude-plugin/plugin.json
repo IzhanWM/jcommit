@@ -1,0 +1,13 @@
+{
+  "name": "jcommit",
+  "displayName": "jcommit",
+  "version": "2.0.0",
+  "description": "Jira-linked commits with documentation-ready descriptions, protected-branch safety (auto <name>/<branch>) and automatic GitLab merge requests.",
+  "author": {
+    "name": "Izhan Ali"
+  },
+  "homepage": "https://github.com/IzhanWM/jcommit#readme",
+  "repository": "https://github.com/IzhanWM/jcommit",
+  "license": "MIT",
+  "keywords": ["git", "jira", "gitlab", "commit", "merge-request", "wavemaker", "documentation"]
+}

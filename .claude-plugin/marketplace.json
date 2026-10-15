@@ -1,0 +1,15 @@
+{
+  "name": "jcommit",
+  "description": "jcommit — Jira + GitLab commit workflow for WaveMaker developers.",
+  "owner": {
+    "name": "Izhan Ali"
+  },
+  "plugins": [
+    {
+      "name": "jcommit",
+      "source": "./",
+      "description": "Jira-linked commits with documentation-ready descriptions, protected-branch safety and automatic GitLab merge requests.",
+      "category": "productivity"
+    }
+  ]
+}
