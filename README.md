@@ -9,9 +9,9 @@ the commit title and a structured description) and as a standalone **CLI**.
 - **Documentation-ready commits.** Every commit is `KEY | <title>` plus a
   short structured body (a *Summary*, optional *Details* and *Upgrade notes*,
   and `Doc-Impact` / `Doc-Area` trailers), written for WaveMaker app
-  developers and sized by how much the change matters to docs. The same text becomes the Jira description and the MR
-  description, so app developer docs and release notes can be built straight
-  from history.
+  developers and sized by how much the change matters to docs. The same text
+  becomes the Jira description and the MR description, so app developer docs
+  and release notes can be built straight from history.
 - **Jira integration.** Reference an existing work item or create one (with
   assignee).
 - **Protected-branch safety.** jcommit detects protected branches from GitLab
@@ -58,8 +58,8 @@ runs the bundled `dist/`.
 
 Claude walks you through the settings (see [Configuration](#configuration)).
 The GitLab token is optional: it adds protected-branch detection from GitLab
-and full MR descriptions. Keep tokens out of the chat. Either export them in your shell profile and
-restart Claude Code:
+and full MR descriptions. Keep tokens out of the chat. Either export them in
+your shell profile and restart Claude Code:
 
 ```sh
 export JIRA_API_TOKEN=...   # https://id.atlassian.com/manage-profile/security/api-tokens
@@ -83,6 +83,40 @@ node <plugin-dir>/dist/index.js setup
 
 Claude confirms before anything outward-facing, such as creating a Jira issue,
 pushing, or opening an MR.
+
+### Typical commit
+
+1. Stage your work: `git add <files>`.
+2. Ask Claude: `/jcommit:commit WMS-123 --push`, or just *"commit this against
+   WMS-123 and push"*. Leave out the key to have a new Jira issue created.
+3. Claude reads the staged diff and shows you the title and a short
+   description. Adjust it if needed, then confirm.
+4. jcommit commits as `WMS-123 | <title>` with the description as the body. If
+   you were on a protected branch, it first moves the work to
+   `<name>/<branch>`. It then pushes and, if `gitlab.autoCreateMr` is on (or you
+   asked for an MR), opens the merge request.
+5. Claude replies with the commit, the branch it landed on, and the MR link.
+
+### Headless (`claude -p`, scripts, CI)
+
+The plugin also runs non-interactively. With nobody to approve tool calls,
+pre-allow them; otherwise Claude stops and nothing is committed:
+
+```sh
+claude -p "Commit the staged changes with jcommit against WMS-123 and push" \
+  --allowedTools "Skill" "Bash(git *)" "Bash(node *)" "Read"
+```
+
+- Claude skips the review step and commits directly, then reports the
+  description it used.
+- It only pushes or opens an MR if the prompt asks for it.
+- Tokens must come from environment variables (`JIRA_API_TOKEN`,
+  `GITLAB_TOKEN`), and the config from `~/.jcommit.json` or `JCOMMIT_CONFIG`.
+- `Bash(node *)` is broad. You can narrow it to the plugin's own
+  `dist/index.js` path.
+
+To skip Claude entirely (for example in a git hook), call the CLI's headless
+mode directly. See [CLI](#cli).
 
 ## Commit format
 
@@ -174,7 +208,9 @@ stay in place.
 
 The config is stored at `~/.jcommit.json`. Override the location with
 `JCOMMIT_CONFIG=/path` or `-c /path`. Edit it with the wizard (`jcommit setup`)
-or non-interactively:
+or non-interactively. With only the plugin installed, `jcommit` is on Claude's
+PATH but not your terminal's, so ask Claude (`/jcommit:setup`) or install the
+[CLI](#cli) to run these yourself:
 
 ```sh
 jcommit config list                     # secrets masked
