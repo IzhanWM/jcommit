@@ -1,4 +1,4 @@
-import { printError, printInfo, printSuccess } from '../utils/colors';
+import { printError, printInfo, printSuccess, printWarning } from '../utils/colors';
 import { runGit, getCurrentBranch } from '../utils/git';
 
 /**
@@ -71,4 +71,25 @@ export function pushCurrentBranch(): void {
     process.exit(1);
   }
   printSuccess('Git push successful');
+}
+
+const DESCRIPTION_MAX_LINES = 15;
+const DESCRIPTION_MAX_CHARS = 1200;
+
+/**
+ * Descriptions feed developer docs, so they should stay short. Long ones are
+ * allowed but flagged (a warning, not an error, so commits are never blocked).
+ */
+export function warnIfLongDescription(description: string | null): void {
+  if (!description) {
+    return;
+  }
+  const lines = description.trim().split('\n').length;
+  const chars = description.trim().length;
+  if (lines > DESCRIPTION_MAX_LINES || chars > DESCRIPTION_MAX_CHARS) {
+    printWarning(
+      `Description is long (${lines} lines, ${chars} chars; aim for ≤ ${DESCRIPTION_MAX_LINES} lines / ` +
+        `${DESCRIPTION_MAX_CHARS} chars). Keep only developer-visible facts, or split the commit.`
+    );
+  }
 }

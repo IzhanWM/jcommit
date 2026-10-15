@@ -16,8 +16,8 @@ User arguments: `$ARGUMENTS`
    is pushed: `git status -sb` (look for `[ahead N]` or no upstream).
 2. The MR title is the last commit subject and its description is the commit
    body plus a link to the Jira issue in the subject. If the body is missing
-   or thin, write a description per
-   [../commit/references/commit-message.md](../commit/references/commit-message.md)
+   or thin, write a description per the `jcommit:describe` skill
+   ([../describe/SKILL.md](../describe/SKILL.md))
    and pass it with `-F -` (heredoc) — it is used for the MR only.
 3. Confirm with the user (opening an MR is visible to the team), then run:
 

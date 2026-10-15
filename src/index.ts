@@ -6,7 +6,7 @@ import { runConfigCommand } from './cli/configCommand';
 import { getConfigPath, readConfig, ensureRequiredConfig, applyEnvOverrides } from './config/config';
 import { runSetup, mainWorkflow } from './workflow/main';
 import { runHeadless } from './workflow/headless';
-import { assertGitRepo, requireCurrentBranch } from './workflow/steps';
+import { assertGitRepo, requireCurrentBranch, warnIfLongDescription } from './workflow/steps';
 import { getRepoContext, loadProtectedBranches, printProtectedBranches } from './workflow/protected';
 import { pushAndCreateMergeRequest } from './workflow/mergeRequest';
 import { getLastCommitMessage } from './utils/git';
@@ -40,6 +40,8 @@ async function runMrCommand(config: GjCommitConfig, parsed: ParsedArgs): Promise
   assertGitRepo();
   const branch = requireCurrentBranch();
   const { subject, body } = getLastCommitMessage();
+  const description = resolveDescription(parsed) || body || subject;
+  warnIfLongDescription(description);
   const jiraKey = subject.match(/^([A-Za-z]+-[0-9]+) \| /)?.[1] || null;
   await pushAndCreateMergeRequest(
     config,
@@ -47,7 +49,7 @@ async function runMrCommand(config: GjCommitConfig, parsed: ParsedArgs): Promise
       sourceBranch: branch,
       targetBranch: parsed.targetBranch,
       title: subject,
-      description: resolveDescription(parsed) || body || subject,
+      description,
       jiraKey,
       jiraUrl: jiraKey && config.jiraDomain ? `https://${config.jiraDomain}/browse/${jiraKey}` : null,
     },

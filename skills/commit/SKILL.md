@@ -12,14 +12,16 @@ jcommit commits the **staged** changes as:
 ```
 KEY | <title>                      ← subject line (Jira-title style)
 
-## Summary                         ← body: the description you write
+## Summary                         ← body: a short description you write
 ...
+Doc-Impact: minor
+Doc-Area: Widgets/Select
 ```
 
 The same description becomes the Jira issue description (new issues) and the
-GitLab merge request description, so **WaveMaker app developer documentation
-can be produced straight from commit history**. Writing that description well is
-the main job of this skill.
+GitLab merge request description, and it's used as input for **WaveMaker app
+developer documentation**. Write it with the `jcommit:describe` skill's rules:
+short, developer-facing, no padding.
 
 User arguments: `$ARGUMENTS`
 
@@ -60,10 +62,11 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
    | User gave a ticket key | `-t KEY -m "<title>"` (or `-t KEY` alone to reuse the Jira summary as `Fix: <summary>`) |
    | No ticket — create one | `-m "<title>"` — **creates a real Jira issue**; confirm first |
 
-4. **Write the title and description** following
-   [references/commit-message.md](references/commit-message.md): a single-line
-   Jira-title (`-m`) plus the structured, app-developer-facing description
-   (`-F -`). Show both to the user and let them adjust before committing.
+4. **Write the title and description** following the `jcommit:describe` skill
+   ([../describe/SKILL.md](../describe/SKILL.md)): a single-line Jira title
+   (`-m`) and a short description (`-F -`) sized by its `Doc-Impact`. Don't
+   pad it: internal changes get one Summary sentence plus trailers. Show both
+   to the user and let them adjust before committing.
 
 5. **Decide push / MR** — check `jcommit config get gitlab.autoCreateMr`.
    - Default is commit only (no push).
@@ -84,7 +87,13 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
    node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" -t WMS-1234 \
      -m "Add date range filter to Data Table" --push -F - <<'EOF'
    ## Summary
-   ...
+   Date columns in the Data Table can be filtered by a from–to range.
+
+   ## Details
+   - New column property `filterType`: `default` | `daterange`. Default `default`.
+
+   Doc-Impact: major
+   Doc-Area: Widgets/Data Table
    EOF
    ```
 
@@ -118,6 +127,7 @@ the current branch from its last commit), `jcommit config list|get|set|unset|pat
 | Symptom | Cause / fix |
 | --- | --- |
 | `No staged changes found.` | Stage files first. |
+| `Description is long (…)` | Warning only. Trim it per the `jcommit:describe` budget, or split the commit. |
 | `Operation cancelled. '<b>' is protected.` | `autoBranchOnProtected` is `false`; switch branch or `jcommit config unset autoBranchOnProtected`. |
 | `Config not found` / `configuration is incomplete` | Run the `jcommit:setup` skill. |
 | `Invalid Jira ticket key` | Use the `PROJ-123` form. |

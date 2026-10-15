@@ -6,6 +6,7 @@ exports.assertStagedChanges = assertStagedChanges;
 exports.buildCommitMessage = buildCommitMessage;
 exports.commitChanges = commitChanges;
 exports.pushCurrentBranch = pushCurrentBranch;
+exports.warnIfLongDescription = warnIfLongDescription;
 const colors_1 = require("../utils/colors");
 const git_1 = require("../utils/git");
 /**
@@ -72,5 +73,22 @@ function pushCurrentBranch() {
         process.exit(1);
     }
     (0, colors_1.printSuccess)('Git push successful');
+}
+const DESCRIPTION_MAX_LINES = 15;
+const DESCRIPTION_MAX_CHARS = 1200;
+/**
+ * Descriptions feed developer docs, so they should stay short. Long ones are
+ * allowed but flagged (a warning, not an error, so commits are never blocked).
+ */
+function warnIfLongDescription(description) {
+    if (!description) {
+        return;
+    }
+    const lines = description.trim().split('\n').length;
+    const chars = description.trim().length;
+    if (lines > DESCRIPTION_MAX_LINES || chars > DESCRIPTION_MAX_CHARS) {
+        (0, colors_1.printWarning)(`Description is long (${lines} lines, ${chars} chars; aim for ≤ ${DESCRIPTION_MAX_LINES} lines / ` +
+            `${DESCRIPTION_MAX_CHARS} chars). Keep only developer-visible facts, or split the commit.`);
+    }
 }
 //# sourceMappingURL=steps.js.map

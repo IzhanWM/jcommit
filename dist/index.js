@@ -41,12 +41,14 @@ async function runMrCommand(config, parsed) {
     (0, steps_1.assertGitRepo)();
     const branch = (0, steps_1.requireCurrentBranch)();
     const { subject, body } = (0, git_1.getLastCommitMessage)();
+    const description = resolveDescription(parsed) || body || subject;
+    (0, steps_1.warnIfLongDescription)(description);
     const jiraKey = subject.match(/^([A-Za-z]+-[0-9]+) \| /)?.[1] || null;
     await (0, mergeRequest_1.pushAndCreateMergeRequest)(config, {
         sourceBranch: branch,
         targetBranch: parsed.targetBranch,
         title: subject,
-        description: resolveDescription(parsed) || body || subject,
+        description,
         jiraKey,
         jiraUrl: jiraKey && config.jiraDomain ? `https://${config.jiraDomain}/browse/${jiraKey}` : null,
     }, { createMr: true, push: parsed.push === true });

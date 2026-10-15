@@ -8,6 +8,7 @@ import {
   buildCommitMessage,
   commitChanges,
   requireCurrentBranch,
+  warnIfLongDescription,
 } from './steps';
 import { ensureWorkBranch, loadProtectedBranches } from './protected';
 import { isAutoMrEnabled, pushAndCreateMergeRequest } from './mergeRequest';
@@ -124,6 +125,7 @@ export async function runHeadless(
 ): Promise<void> {
 
   validateOptions(options);
+  warnIfLongDescription(options.description);
 
   assertGitRepo();
   let currentBranch = requireCurrentBranch();

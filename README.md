@@ -7,9 +7,9 @@ It ships as a **Claude Code plugin** (Claude reads the staged diff and writes
 the commit title and a structured description) and as a standalone **CLI**.
 
 - **Documentation-ready commits.** Every commit is `KEY | <title>` plus a
-  structured body (*Summary, What changed, Developer impact, Documentation notes,
-  Testing* and `Doc-Impact` / `Doc-Area` trailers), written for WaveMaker app
-  developers. The same text becomes the Jira description and the MR
+  short structured body (a *Summary*, optional *Details* and *Upgrade notes*,
+  and `Doc-Impact` / `Doc-Area` trailers), written for WaveMaker app
+  developers and sized by how much the change matters to docs. The same text becomes the Jira description and the MR
   description, so app developer docs and release notes can be built straight
   from history.
 - **Jira integration.** Reference an existing work item or create one (with
@@ -79,6 +79,7 @@ node <plugin-dir>/dist/index.js setup
 | --- | --- |
 | `/jcommit:commit [KEY] [--push] [--mr]` | Reads the staged diff, drafts the title and documentation-ready description, shows them to you, then commits (and pushes and opens an MR if asked or configured). Claude also picks this up from plain requests like *"commit this against WMS-123 and raise an MR"*. |
 | `/jcommit:mr [--target <branch>]` | Opens a GitLab MR for work that's already committed. |
+| `/jcommit:describe [commit]` | Drafts or reviews a description for the staged changes (or a commit) without committing. |
 | `/jcommit:setup` | Creates or changes the configuration. |
 
 Claude confirms before anything outward-facing, such as creating a Jira issue,
@@ -90,27 +91,30 @@ pushing, or opening an MR.
 WMS-1234 | Add date range filter to Data Table
 
 ## Summary
-Data Table date columns can now be filtered by a from–to range...
+Date columns in the Data Table can be filtered by a from–to range, so you no longer need a custom header template.
 
-## What changed
-- New column property `filterType` with value `daterange`...
-
-## Developer impact
-- Opt-in: existing tables are unchanged...
-
-## Documentation notes
-- Data Table → Columns → `filterType`: `default` | `daterange`...
-
-## Testing
-- Unit tests for the range predicate; verified in Chrome and Firefox.
+## Details
+- New column property `filterType`: `default` | `daterange` (date and datetime columns only). Default `default`.
+- Not available in React Native apps yet.
 
 Doc-Impact: major
 Doc-Area: Widgets/Data Table
 ```
 
-The full guide is in
-[`skills/commit/references/commit-message.md`](skills/commit/references/commit-message.md).
-To mine history for docs:
+Descriptions are deliberately short. `## Summary` and the two trailers are
+always there. `## Details` and `## Upgrade notes` appear only when they carry
+developer-visible facts. Length follows `Doc-Impact`:
+
+| Doc-Impact | Description |
+| --- | --- |
+| `none` (internal) | One Summary sentence and trailers |
+| `minor` | Summary and up to 3 Details bullets |
+| `major` | Summary, up to 5 Details bullets, and Upgrade notes if existing apps are affected |
+
+No file lists, implementation narration or test boilerplate. The CLI warns
+when a description passes 15 lines or 1,200 characters. The full rules are in
+the [`describe` skill](skills/describe/SKILL.md) (`/jcommit:describe` drafts or
+reviews a description without committing). To mine history for docs:
 
 ```sh
 git log --grep='^Doc-Impact: major' --format='%h %s'
@@ -265,7 +269,8 @@ CI (`.gitlab-ci.yml`) fails if `dist/` is stale. Check the plugin with
 └── marketplace.json   # lets the repo act as its own plugin marketplace
 bin/jcommit            # added to Claude's PATH when the plugin is enabled
 skills/
-├── commit/            # /jcommit:commit (+ references/commit-message.md)
+├── commit/            # /jcommit:commit
+├── describe/          # /jcommit:describe (description rules, used by commit and mr)
 ├── mr/                # /jcommit:mr
 └── setup/             # /jcommit:setup
 src/

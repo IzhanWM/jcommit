@@ -92,6 +92,7 @@ async function resolveIssue(jiraService, options) {
 }
 async function runHeadless(config, configPath, options) {
     validateOptions(options);
+    (0, steps_1.warnIfLongDescription)(options.description);
     (0, steps_1.assertGitRepo)();
     let currentBranch = (0, steps_1.requireCurrentBranch)();
     (0, colors_1.printInfo)(`Branch: ${currentBranch}`);
