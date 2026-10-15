@@ -10,11 +10,10 @@ import {
   assertStagedChanges,
   buildCommitMessage,
   commitChanges,
-  pushCurrentBranch,
   requireCurrentBranch,
 } from './steps';
 import { ensureWorkBranch, loadProtectedBranches } from './protected';
-import { createMergeRequest, isAutoMrEnabled } from './mergeRequest';
+import { isAutoMrEnabled, pushAndCreateMergeRequest } from './mergeRequest';
 
 export async function runSetup(configPath: string): Promise<void> {
   const existingConfig = readConfig(configPath) || {} as Partial<GjCommitConfig>;
@@ -304,17 +303,18 @@ export async function mainWorkflow(config: GjCommitConfig, configPath: string): 
   const pushed = await promptYesNo(rlPush, pushQuestion);
   rlPush.close();
   if (pushed) {
-    pushCurrentBranch();
-    if (autoMr) {
-      await createMergeRequest(config, {
+    await pushAndCreateMergeRequest(
+      config,
+      {
         sourceBranch: currentBranch,
         baseBranch: baseBranchForMr,
         title: commitMessage,
         description: commitBody || commitMessage,
         jiraKey: issueKey || null,
         jiraUrl: issueKey ? jiraService.browseUrl(issueKey) : null,
-      });
-    }
+      },
+      { createMr: autoMr, push: true }
+    );
   } else {
     printInfo('Commit was not pushed to remote.');
   }

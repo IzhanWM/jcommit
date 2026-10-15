@@ -57,7 +57,8 @@ runs the bundled `dist/`.
 ```
 
 Claude walks you through the settings (see [Configuration](#configuration)).
-Keep tokens out of the chat. Either export them in your shell profile and
+The GitLab token is optional: it adds protected-branch detection from GitLab
+and full MR descriptions. Keep tokens out of the chat. Either export them in your shell profile and
 restart Claude Code:
 
 ```sh
@@ -143,10 +144,25 @@ opens an MR. Without it, `--mr` creates one for a single run.
 | --- | --- |
 | API URL | `gitlab.url`, or `https://<host of origin remote>` |
 | Project | Path of the `origin` remote, e.g. `group/sub/project` |
-| Token | `gitlab.token`, `$GITLAB_TOKEN` or `$JCOMMIT_GITLAB_TOKEN` (scope `api`) |
+| Token | Optional. `gitlab.token`, `$GITLAB_TOKEN` or `$JCOMMIT_GITLAB_TOKEN` (scope `api`). Without one, push options are used (see below) |
 | Target branch | `--target`, then the protected branch you were moved off, then the `--base` of `--create-branch`, then `gitlab.defaultTargetBranch`, then the project default |
 | Title / description | Commit subject / commit body, plus a link to the Jira issue |
 | Options | `gitlab.removeSourceBranch` (default `true`), `gitlab.squash`, `gitlab.draft`, `gitlab.labels`, `gitlab.assigneeIds`, `gitlab.reviewerIds` |
+
+**Without a GitLab token**, jcommit still opens the MR. It uses
+[GitLab push options](https://docs.gitlab.com/user/project/push_options/) on
+the push itself (`git push -o merge_request.create …`), which work with your
+existing SSH or git credentials. Trade-offs compared with the API:
+
+- Git doesn't allow line breaks in push options, so the MR description is the
+  one-line Summary plus the Jira link. The full structured description stays in
+  the commit.
+- `gitlab.reviewerIds` and `gitlab.squash` can't be set. Title, target, labels,
+  assignees, draft and remove-source-branch work.
+- GitLab only reads push options when something new is pushed, so
+  `jcommit mr` on an already-pushed branch needs a token.
+- If the remote doesn't accept push options, jcommit pushes normally and
+  reports that no MR was created.
 
 An MR failure is reported with a non-zero exit code, but the commit and push
 stay in place.

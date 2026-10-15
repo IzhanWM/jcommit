@@ -6,9 +6,9 @@ import { runConfigCommand } from './cli/configCommand';
 import { getConfigPath, readConfig, ensureRequiredConfig, applyEnvOverrides } from './config/config';
 import { runSetup, mainWorkflow } from './workflow/main';
 import { runHeadless } from './workflow/headless';
-import { assertGitRepo, pushCurrentBranch, requireCurrentBranch } from './workflow/steps';
+import { assertGitRepo, requireCurrentBranch } from './workflow/steps';
 import { getRepoContext, loadProtectedBranches, printProtectedBranches } from './workflow/protected';
-import { createMergeRequest } from './workflow/mergeRequest';
+import { pushAndCreateMergeRequest } from './workflow/mergeRequest';
 import { getLastCommitMessage } from './utils/git';
 import { GjCommitConfig, ParsedArgs } from './types';
 import { printError, printInfo, printWarning } from './utils/colors';
@@ -39,19 +39,20 @@ async function runProtectedCommand(config: GjCommitConfig, configPath: string, r
 async function runMrCommand(config: GjCommitConfig, parsed: ParsedArgs): Promise<void> {
   assertGitRepo();
   const branch = requireCurrentBranch();
-  if (parsed.push === true) {
-    pushCurrentBranch();
-  }
   const { subject, body } = getLastCommitMessage();
   const jiraKey = subject.match(/^([A-Za-z]+-[0-9]+) \| /)?.[1] || null;
-  await createMergeRequest(config, {
-    sourceBranch: branch,
-    targetBranch: parsed.targetBranch,
-    title: subject,
-    description: resolveDescription(parsed) || body || subject,
-    jiraKey,
-    jiraUrl: jiraKey && config.jiraDomain ? `https://${config.jiraDomain}/browse/${jiraKey}` : null,
-  });
+  await pushAndCreateMergeRequest(
+    config,
+    {
+      sourceBranch: branch,
+      targetBranch: parsed.targetBranch,
+      title: subject,
+      description: resolveDescription(parsed) || body || subject,
+      jiraKey,
+      jiraUrl: jiraKey && config.jiraDomain ? `https://${config.jiraDomain}/browse/${jiraKey}` : null,
+    },
+    { createMr: true, push: parsed.push === true }
+  );
 }
 
 async function run(): Promise<void> {

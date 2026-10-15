@@ -29,5 +29,9 @@ User arguments: `$ARGUMENTS`
    - Target defaults to `--target`, else `gitlab.defaultTargetBranch`, else the
      project's default branch.
    - If an MR is already open for the branch, its URL is printed instead.
+   - Without a GitLab token this always pushes, because the MR is created through
+     git push options. It only works if the push sends new commits. For a branch
+     that's already up to date, the user needs a token (or can open the MR in
+     GitLab).
 4. Report the MR URL. On `GitLab token missing` / API errors, see the
    `jcommit:setup` skill.

@@ -7,11 +7,10 @@ import {
   assertStagedChanges,
   buildCommitMessage,
   commitChanges,
-  pushCurrentBranch,
   requireCurrentBranch,
 } from './steps';
 import { ensureWorkBranch, loadProtectedBranches } from './protected';
-import { createMergeRequest, isAutoMrEnabled } from './mergeRequest';
+import { isAutoMrEnabled, pushAndCreateMergeRequest } from './mergeRequest';
 
 const JIRA_KEY_PATTERN = /^[A-Za-z]+-[0-9]+$/;
 
@@ -149,23 +148,24 @@ export async function runHeadless(
   const push = options.push === true || options.mr === true;
 
   if (push) {
-    pushCurrentBranch();
+    await pushAndCreateMergeRequest(
+      config,
+      {
+        sourceBranch: currentBranch,
+        targetBranch: options.targetBranch,
+        baseBranch: workBranch.protectedBase || options.baseBranch,
+        title: issue.subject,
+        description: options.description || issue.subject,
+        jiraKey: issue.key,
+        jiraUrl: jiraService.browseUrl(issue.key),
+      },
+      { createMr, push }
+    );
   } else {
     printInfo('Commit was not pushed to remote. Pass --push to push.');
-  }
-
-  if (createMr && push) {
-    await createMergeRequest(config, {
-      sourceBranch: currentBranch,
-      targetBranch: options.targetBranch,
-      baseBranch: workBranch.protectedBase || options.baseBranch,
-      title: issue.subject,
-      description: options.description || issue.subject,
-      jiraKey: issue.key,
-      jiraUrl: jiraService.browseUrl(issue.key),
-    });
-  } else if (createMr) {
-    printInfo('Merge request not created because the branch was not pushed. Pass --push or --mr.');
+    if (createMr) {
+      printInfo('Merge request not created because the branch was not pushed. Pass --push or --mr.');
+    }
   }
 
   printSuccess('Committed successfully!');

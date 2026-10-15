@@ -72,6 +72,8 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
    - MR target: `--target <branch>`, else the protected branch the work was
      moved off, else `--base` of `--create-branch`, else
      `gitlab.defaultTargetBranch`, else the project default branch.
+   - Without a GitLab token the MR is created through git push options: same
+     title, target, labels and assignees, but a one-line description.
    - Pushing and opening an MR are outward-facing: get the user's go-ahead unless
      they already asked for it.
 
@@ -120,7 +122,8 @@ the current branch from its last commit), `jcommit config list|get|set|unset|pat
 | `Config not found` / `configuration is incomplete` | Run the `jcommit:setup` skill. |
 | `Invalid Jira ticket key` | Use the `PROJ-123` form. |
 | 401/403 from Jira | Bad/expired token or wrong `jiraEmail`. |
-| `GitLab token missing` | `GITLAB_TOKEN` env var or `gitlab.token` (see `jcommit:setup`). |
+| `No GitLab token — creating the merge request with git push options` | Expected without a token. The MR gets a one-line description; set `GITLAB_TOKEN` for the full one. |
+| `remote does not support push options` / `did not process the merge request options` | No MR was created (commit and push are fine). Set a GitLab token, or open the MR in GitLab. |
 | `GitLab API 401/403` | Token lacks `api` scope or project access. |
 | `GitLab API 404` | Wrong `gitlab.url` / project path — check `git remote -v`; set `gitlab.url` for SSH host aliases. |
 | `Git push failed` | No remote access — check `git remote -v` and credentials. |

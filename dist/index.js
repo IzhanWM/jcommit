@@ -40,19 +40,16 @@ async function runProtectedCommand(config, configPath, refresh) {
 async function runMrCommand(config, parsed) {
     (0, steps_1.assertGitRepo)();
     const branch = (0, steps_1.requireCurrentBranch)();
-    if (parsed.push === true) {
-        (0, steps_1.pushCurrentBranch)();
-    }
     const { subject, body } = (0, git_1.getLastCommitMessage)();
     const jiraKey = subject.match(/^([A-Za-z]+-[0-9]+) \| /)?.[1] || null;
-    await (0, mergeRequest_1.createMergeRequest)(config, {
+    await (0, mergeRequest_1.pushAndCreateMergeRequest)(config, {
         sourceBranch: branch,
         targetBranch: parsed.targetBranch,
         title: subject,
         description: resolveDescription(parsed) || body || subject,
         jiraKey,
         jiraUrl: jiraKey && config.jiraDomain ? `https://${config.jiraDomain}/browse/${jiraKey}` : null,
-    });
+    }, { createMr: true, push: parsed.push === true });
 }
 async function run() {
     const parsed = (0, args_1.parseArgs)(process.argv.slice(2));

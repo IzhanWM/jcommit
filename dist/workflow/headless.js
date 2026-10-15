@@ -108,13 +108,7 @@ async function runHeadless(config, configPath, options) {
     const createMr = options.mr ?? (0, mergeRequest_1.isAutoMrEnabled)(config);
     const push = options.push === true || options.mr === true;
     if (push) {
-        (0, steps_1.pushCurrentBranch)();
-    }
-    else {
-        (0, colors_1.printInfo)('Commit was not pushed to remote. Pass --push to push.');
-    }
-    if (createMr && push) {
-        await (0, mergeRequest_1.createMergeRequest)(config, {
+        await (0, mergeRequest_1.pushAndCreateMergeRequest)(config, {
             sourceBranch: currentBranch,
             targetBranch: options.targetBranch,
             baseBranch: workBranch.protectedBase || options.baseBranch,
@@ -122,10 +116,13 @@ async function runHeadless(config, configPath, options) {
             description: options.description || issue.subject,
             jiraKey: issue.key,
             jiraUrl: jiraService.browseUrl(issue.key),
-        });
+        }, { createMr, push });
     }
-    else if (createMr) {
-        (0, colors_1.printInfo)('Merge request not created because the branch was not pushed. Pass --push or --mr.');
+    else {
+        (0, colors_1.printInfo)('Commit was not pushed to remote. Pass --push to push.');
+        if (createMr) {
+            (0, colors_1.printInfo)('Merge request not created because the branch was not pushed. Pass --push or --mr.');
+        }
     }
     (0, colors_1.printSuccess)('Committed successfully!');
 }

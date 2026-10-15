@@ -242,17 +242,14 @@ async function mainWorkflow(config, configPath) {
     const pushed = await (0, prompts_1.promptYesNo)(rlPush, pushQuestion);
     rlPush.close();
     if (pushed) {
-        (0, steps_1.pushCurrentBranch)();
-        if (autoMr) {
-            await (0, mergeRequest_1.createMergeRequest)(config, {
-                sourceBranch: currentBranch,
-                baseBranch: baseBranchForMr,
-                title: commitMessage,
-                description: commitBody || commitMessage,
-                jiraKey: issueKey || null,
-                jiraUrl: issueKey ? jiraService.browseUrl(issueKey) : null,
-            });
-        }
+        await (0, mergeRequest_1.pushAndCreateMergeRequest)(config, {
+            sourceBranch: currentBranch,
+            baseBranch: baseBranchForMr,
+            title: commitMessage,
+            description: commitBody || commitMessage,
+            jiraKey: issueKey || null,
+            jiraUrl: issueKey ? jiraService.browseUrl(issueKey) : null,
+        }, { createMr: autoMr, push: true });
     }
     else {
         (0, colors_1.printInfo)('Commit was not pushed to remote.');

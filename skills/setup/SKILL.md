@@ -21,8 +21,16 @@ User request: `$ARGUMENTS`
 
 ## 1. Secrets — keep them out of the chat
 
-Two tokens are needed: a **Jira API token** (always) and a **GitLab personal
-access token** with `api` scope (for protected-branch detection and MRs). Offer
+A **Jira API token** is required. A **GitLab personal access token** (`api`
+scope) is optional. Without it, jcommit still opens MRs through git push options
+using the user's existing git credentials, but:
+- MR descriptions are one line (Summary and Jira link, not the full structured
+  description);
+- reviewers and squash can't be set;
+- protected branches come only from the config plus the remote default branch,
+  not from GitLab.
+
+Ask whether they want the token for those. Offer
 the user these options, in this order, and never ask them to paste a token
 into the conversation:
 
