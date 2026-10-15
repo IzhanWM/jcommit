@@ -1,6 +1,6 @@
 ---
 name: commit
-description: Commit staged changes with jcommit — a Jira-linked commit whose title and structured, documentation-ready description are written from the staged diff, then optionally pushed with a GitLab merge request opened automatically. Moves work off protected branches to <name>/<branch> on its own. Use when the user asks to commit (with jcommit), make a Jira-linked commit, create a Jira ticket for their changes, push and raise an MR, or run the jcommit workflow.
+description: Commit staged changes with jcommit — a Jira-linked commit that always gets a short, documentation-ready description written from the staged diff, then optionally pushed with a GitLab merge request opened automatically. Moves work off protected branches to <name>/<branch> on its own. Use when the user asks to commit (with jcommit), make a Jira-linked commit, create a Jira ticket for their changes, push and raise an MR, or run the jcommit workflow.
 argument-hint: "[JIRA-KEY] [--push] [--mr] [extra instructions]"
 allowed-tools: Bash(git status *), Bash(git diff *), Bash(git log *), Bash(git branch *), Bash(git rev-parse *)
 ---
@@ -18,10 +18,11 @@ Doc-Impact: minor
 Doc-Area: Widgets/Select
 ```
 
-The same description becomes the Jira issue description (new issues) and the
-GitLab merge request description, and it's used as input for **WaveMaker app
-developer documentation**. Write it with the `jcommit:describe` skill's rules:
-short, developer-facing, no padding.
+**Every commit gets a description; this is the default and needs no request
+from the user.** It becomes the commit body, the Jira issue description (new
+issues) and the GitLab merge request description, and it's used as input for
+**WaveMaker app developer documentation**. Keep it short and developer-facing,
+per [references/description.md](references/description.md).
 
 User arguments: `$ARGUMENTS`
 
@@ -59,14 +60,25 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
 3. **Pick the Jira mode**
    | Situation | Flags |
    | --- | --- |
-   | User gave a ticket key | `-t KEY -m "<title>"` (or `-t KEY` alone to reuse the Jira summary as `Fix: <summary>`) |
+   | User gave a ticket key | `-t KEY -m "<title>"` (or `-t KEY` alone to reuse the Jira summary as `Fix: <summary>`). Pass the description with `-F -` either way. |
    | No ticket — create one | `-m "<title>"` — **creates a real Jira issue**; confirm first |
 
-4. **Write the title and description** following the `jcommit:describe` skill
-   ([../describe/SKILL.md](../describe/SKILL.md)): a single-line Jira title
-   (`-m`) and a short description (`-F -`) sized by its `Doc-Impact`. Don't
-   pad it: internal changes get one Summary sentence plus trailers. Show both
-   to the user and let them adjust before committing.
+4. **Write the title and description. Always do this; never commit without a
+   description.** Read [references/description.md](references/description.md)
+   for the full rules and examples. The essentials:
+   - Title (`-m`): one line, about 50–72 characters, imperative, outcome-level,
+     naming the WaveMaker surface.
+   - Description (`-F -`): `## Summary` (1–2 sentences) always; `## Details`
+     and `## Upgrade notes` only when they hold developer-visible facts; then
+     the `Doc-Impact:` and `Doc-Area:` trailers.
+   - Size follows `Doc-Impact`: `none` gets one Summary sentence and trailers;
+     `minor` up to 3 bullets; `major` up to 5 bullets plus upgrade notes. About
+     15 lines at most.
+   - No file lists, implementation narration, test boilerplate, repeated title
+     or "None" sections.
+
+   Show the title and description to the user and let them adjust before
+   committing.
 
 5. **Decide push / MR** — check `jcommit config get gitlab.autoCreateMr`.
    - Default is commit only (no push).
@@ -127,7 +139,7 @@ the current branch from its last commit), `jcommit config list|get|set|unset|pat
 | Symptom | Cause / fix |
 | --- | --- |
 | `No staged changes found.` | Stage files first. |
-| `Description is long (…)` | Warning only. Trim it per the `jcommit:describe` budget, or split the commit. |
+| `Description is long (…)` | Warning only. Trim it to the budget in references/description.md, or split the commit. |
 | `Operation cancelled. '<b>' is protected.` | `autoBranchOnProtected` is `false`; switch branch or `jcommit config unset autoBranchOnProtected`. |
 | `Config not found` / `configuration is incomplete` | Run the `jcommit:setup` skill. |
 | `Invalid Jira ticket key` | Use the `PROJ-123` form. |

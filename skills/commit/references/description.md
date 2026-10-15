@@ -1,22 +1,14 @@
----
-name: describe
-description: How to write a jcommit commit description — the short, structured, app-developer-facing text that becomes the commit body, Jira description and GitLab MR description, and is later used as input for WaveMaker app developer documentation. Use when drafting or reviewing a description for jcommit (the commit and mr skills rely on it), or when the user asks to write/improve a commit or MR description.
-argument-hint: "[commit-ish to review, default: staged changes]"
-allowed-tools: Bash(git status *), Bash(git diff *), Bash(git log *), Bash(git show *)
----
-
-# Writing jcommit descriptions
+# Writing the description (default for every commit)
 
 One description is reused as the **commit body**, the **Jira description**
 (new issues) and the **MR description**. It is also **input for WaveMaker app
 developer docs** and release notes. Docs writers read many of these in a row,
 so every line must earn its place: **short, factual, developer-facing.**
 
-User arguments: `$ARGUMENTS`. With no arguments, describe the staged changes
-(`git diff --cached --stat`, then `git diff --cached`). With a commit-ish,
-review or rewrite that commit's description (`git show --stat <ref>`,
-`git show <ref>`). When you're done, show the result to the user and don't
-commit; the `jcommit:commit` skill does that.
+The `jcommit:commit` and `jcommit:mr` skills follow these rules every time they
+write a description. Base it on what is actually in the diff
+(`git diff --cached --stat`, then `git diff --cached`), never on the
+conversation alone.
 
 ## Template
 

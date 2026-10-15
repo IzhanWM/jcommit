@@ -79,7 +79,6 @@ node <plugin-dir>/dist/index.js setup
 | --- | --- |
 | `/jcommit:commit [KEY] [--push] [--mr]` | Reads the staged diff, drafts the title and documentation-ready description, shows them to you, then commits (and pushes and opens an MR if asked or configured). Claude also picks this up from plain requests like *"commit this against WMS-123 and raise an MR"*. |
 | `/jcommit:mr [--target <branch>]` | Opens a GitLab MR for work that's already committed. |
-| `/jcommit:describe [commit]` | Drafts or reviews a description for the staged changes (or a commit) without committing. |
 | `/jcommit:setup` | Creates or changes the configuration. |
 
 Claude confirms before anything outward-facing, such as creating a Jira issue,
@@ -112,9 +111,9 @@ developer-visible facts. Length follows `Doc-Impact`:
 | `major` | Summary, up to 5 Details bullets, and Upgrade notes if existing apps are affected |
 
 No file lists, implementation narration or test boilerplate. The CLI warns
-when a description passes 15 lines or 1,200 characters. The full rules are in
-the [`describe` skill](skills/describe/SKILL.md) (`/jcommit:describe` drafts or
-reviews a description without committing). To mine history for docs:
+when a description passes 15 lines or 1,200 characters. Claude writes this
+description on every commit by default, with no extra command. The full rules
+are in [`skills/commit/references/description.md`](skills/commit/references/description.md). To mine history for docs:
 
 ```sh
 git log --grep='^Doc-Impact: major' --format='%h %s'
@@ -269,8 +268,7 @@ CI (`.gitlab-ci.yml`) fails if `dist/` is stale. Check the plugin with
 └── marketplace.json   # lets the repo act as its own plugin marketplace
 bin/jcommit            # added to Claude's PATH when the plugin is enabled
 skills/
-├── commit/            # /jcommit:commit
-├── describe/          # /jcommit:describe (description rules, used by commit and mr)
+├── commit/            # /jcommit:commit (+ references/description.md: description rules)
 ├── mr/                # /jcommit:mr
 └── setup/             # /jcommit:setup
 src/
