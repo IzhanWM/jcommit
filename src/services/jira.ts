@@ -16,7 +16,7 @@ export function markdownToAdf(markdown: string): AdfNode[] {
 
   const flushParagraph = () => {
     if (paragraph.length) {
-      // Keep line breaks (e.g. `Doc-Impact:` / `Doc-Area:` trailers) instead of reflowing.
+      // Keep line breaks (e.g. `Release-Note:` / `Release-Area:` trailers) instead of reflowing.
       const content = paragraph.flatMap((line, index) =>
         index ? [{ type: 'hardBreak' }, textNode(line)] : [textNode(line)]
       );

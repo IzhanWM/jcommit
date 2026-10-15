@@ -7,9 +7,10 @@ It ships as a **Claude Code plugin** (Claude reads the staged diff and writes
 the commit title and a structured description) and as a standalone **CLI**.
 
 - **Documentation-ready commits.** Every commit is `KEY | <title>` plus a
-  short structured body (a *Summary*, optional *Details* and *Upgrade notes*,
-  and `Doc-Impact` / `Doc-Area` trailers), written for WaveMaker app
-  developers and sized by how much the change matters to docs. The same text
+  short structured body: a one-sentence *Summary*, optional *Details* and
+  *Upgrade notes*, and trailers that match the
+  [WaveMaker docs](https://github.com/IzhanWM/docs) release notes structure
+  (tab, section, Web/Mobile platform, doc link). The same text
   becomes the Jira description and the MR description, so app developer docs
   and release notes can be built straight from history.
 - **Jira integration.** Reference an existing work item or create one (with
@@ -124,34 +125,55 @@ mode directly. See [CLI](#cli).
 WMS-1234 | Add date range filter to Data Table
 
 ## Summary
-Date columns in the Data Table can be filtered by a from–to range, so you no longer need a custom header template.
+Filter Data Table date columns by a from–to range without a custom header template.
 
 ## Details
 - New column property `filterType`: `default` | `daterange` (date and datetime columns only). Default `default`.
-- Not available in React Native apps yet.
+- Works with client-side and server-side (`filterMode`) pagination.
 
-Doc-Impact: major
-Doc-Area: Widgets/Data Table
+Release-Note: Features
+Release-Area: User Interface
+Platforms: Web
+Component: Table and DataTable
 ```
 
-Descriptions are deliberately short. `## Summary` and the two trailers are
-always there. `## Details` and `## Upgrade notes` appear only when they carry
-developer-visible facts. Length follows `Doc-Impact`:
+The description is shaped for the WaveMaker docs repo
+([IzhanWM/docs](https://github.com/IzhanWM/docs)) and its `wm-ai-release-notes`
+skill:
 
-| Doc-Impact | Description |
+| Commit part | Release notes use |
 | --- | --- |
-| `none` (internal) | One Summary sentence and trailers |
-| `minor` | Summary and up to 3 Details bullets |
-| `major` | Summary, up to 5 Details bullets, and Upgrade notes if existing apps are affected |
+| `## Summary` | The one-sentence entry body (bug fixes start with "Fixed") |
+| `Release-Note:` | Tab: `Features`, `Enhancements`, `Bug Fixes`, or `None` for internal changes |
+| `Release-Area:` | Section: `User Interface`, `Backend`, `Platform`, `Product Ecosystem` |
+| `Platforms:` | `Web` / `Mobile` pills (left out when platform-neutral) |
+| `Component:` | Optional grouping heading, e.g. `Table and DataTable` |
+| `Docs:` | Optional `/docs/...` link, only for a page that exists |
+| `## Details`, `## Upgrade notes` | Material for the linked doc page and migration notes |
+
+Descriptions are deliberately short. Only `## Summary` and `Release-Note:` are
+always present; the rest appear when they carry information. Length follows
+`Release-Note`:
+
+| Release-Note | Description |
+| --- | --- |
+| `None` (internal) | One Summary sentence |
+| `Bug Fixes` | Summary and trailers (up to 3 "Fixed" bullets for related symptoms) |
+| `Enhancements` | Summary and up to 3 Details bullets |
+| `Features` | Summary, up to 5 Details bullets, and Upgrade notes if existing apps are affected |
 
 No file lists, implementation narration or test boilerplate. The CLI warns
 when a description passes 15 lines or 1,200 characters. Claude writes this
 description on every commit by default, with no extra command. The full rules
-are in [`skills/commit/references/description.md`](skills/commit/references/description.md). To mine history for docs:
+are in [`skills/commit/references/description.md`](skills/commit/references/description.md).
+
+To list a release's items, grouped by tab and section, as input for release
+notes:
 
 ```sh
-git log --grep='^Doc-Impact: major' --format='%h %s'
-git log --format='%(trailers:key=Doc-Area,valueonly)%x09%s'
+git log <previous-tag>..<release-tag> --no-merges \
+  --format='%(trailers:key=Release-Note,valueonly,separator=)|%(trailers:key=Release-Area,valueonly,separator=)|%(trailers:key=Platforms,valueonly,separator=)|%s' \
+  | grep -v '^None|' | grep -v '^|' | sort
 ```
 
 ## Protected branches

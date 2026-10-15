@@ -14,8 +14,8 @@ KEY | <title>                      ← subject line (Jira-title style)
 
 ## Summary                         ← body: a short description you write
 ...
-Doc-Impact: minor
-Doc-Area: Widgets/Select
+Release-Note: Bug Fixes
+Release-Area: User Interface
 ```
 
 **Every commit gets a description; this is the default and needs no request
@@ -67,13 +67,20 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
    description.** Read [references/description.md](references/description.md)
    for the full rules and examples. The essentials:
    - Title (`-m`): one line, about 50–72 characters, imperative, outcome-level,
-     naming the WaveMaker surface.
-   - Description (`-F -`): `## Summary` (1–2 sentences) always; `## Details`
-     and `## Upgrade notes` only when they hold developer-visible facts; then
-     the `Doc-Impact:` and `Doc-Area:` trailers.
-   - Size follows `Doc-Impact`: `none` gets one Summary sentence and trailers;
-     `minor` up to 3 bullets; `major` up to 5 bullets plus upgrade notes. About
-     15 lines at most.
+     naming the WaveMaker feature.
+   - `## Summary`: always **one sentence**, the release-note body. Active
+     voice, present tense, no marketing words; bug fixes start with "Fixed".
+   - `## Details` / `## Upgrade notes`: only when they hold developer-visible
+     facts.
+   - Trailers, matching the docs' release notes structure:
+     `Release-Note: Features | Enhancements | Bug Fixes | None` (always);
+     `Release-Area: User Interface | Backend | Platform | Product Ecosystem`;
+     `Platforms: Web, Mobile` (if platform-specific); optional `Component:`;
+     `Docs: /docs/...` only for a page you know exists.
+   - Size follows `Release-Note`: `None` = one sentence; `Bug Fixes` =
+     Summary only (up to 3 "Fixed" bullets for related symptoms);
+     `Enhancements` up to 3 bullets; `Features` up to 5 plus upgrade notes.
+     About 15 lines at most.
    - No file lists, implementation narration, test boilerplate, repeated title
      or "None" sections.
 
@@ -99,13 +106,15 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
    node "${CLAUDE_PLUGIN_ROOT}/dist/index.js" -t WMS-1234 \
      -m "Add date range filter to Data Table" --push -F - <<'EOF'
    ## Summary
-   Date columns in the Data Table can be filtered by a from–to range.
+   Filter Data Table date columns by a from–to range without a custom header template.
 
    ## Details
    - New column property `filterType`: `default` | `daterange`. Default `default`.
 
-   Doc-Impact: major
-   Doc-Area: Widgets/Data Table
+   Release-Note: Features
+   Release-Area: User Interface
+   Platforms: Web
+   Component: Table and DataTable
    EOF
    ```
 
