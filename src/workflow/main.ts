@@ -208,9 +208,7 @@ export async function mainWorkflow(config: GjCommitConfig, configPath: string): 
 
   const jiraService = new JiraService(config);
 
-  const openIssues = config.jiraAssigneeId
-    ? await jiraService.getOpenIssues(config.jiraEmail, config.jiraAssigneeId)
-    : await jiraService.getOpenIssues(config.jiraEmail);
+  const openIssues = await jiraService.getOpenIssues(config.jiraAssigneeId);
 
   if (openIssues.length > 0) {
     console.log('');

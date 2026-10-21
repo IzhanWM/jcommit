@@ -89,6 +89,7 @@ class JiraService {
             summary: issue?.fields?.summary || '',
             status: issue?.fields?.status?.name || '',
             priority: issue?.fields?.priority?.name || '',
+            type: issue?.fields?.issuetype?.name || '',
         };
     }
     async createIssue(summary, description) {
@@ -135,20 +136,25 @@ class JiraService {
         const data = await this.fetchJiraJson(`https://${this.config.jiraDomain}/rest/api/3/issue/${issueId}?fields=summary,status,priority`, 'Failed to fetch Jira issue.');
         return this.toJiraIssue(data);
     }
-    async getOpenIssues(jiraEmail, jiraAssigneeId) {
-        const assignee = jiraAssigneeId ? `"${jiraAssigneeId}"` : `"${jiraEmail}"`;
-        const jql = `assignee = ${assignee} AND resolution = Unresolved AND status in ("Open","Reopened", "To Do", "In Progress") ORDER BY created ASC`;
+    /**
+     * Unresolved issues assigned to `jiraAssigneeId`, or to the token's own user
+     * (`currentUser()`) when no assignee is configured. Uses the status category
+     * so custom workflow states (e.g. "In Review") are included.
+     */
+    async getOpenIssues(jiraAssigneeId, limit = 100) {
+        const assignee = jiraAssigneeId ? `"${jiraAssigneeId}"` : 'currentUser()';
+        const jql = `assignee = ${assignee} AND statusCategory != Done ORDER BY updated DESC`;
         const response = await fetch(`https://${this.config.jiraDomain}/rest/api/3/search/jql`, {
             method: 'POST',
             headers: {
                 ...this.getAuthHeaders(),
-                'Accept': 'application/json',
+                Accept: 'application/json',
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                jql: jql,
-                fields: ['summary', 'status'],
-                maxResults: 100,
+                jql,
+                fields: ['summary', 'status', 'priority', 'issuetype'],
+                maxResults: limit,
             }),
         });
         if (!response.ok) {

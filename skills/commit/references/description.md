@@ -16,10 +16,21 @@ The description captures exactly those, so release notes can be assembled
 straight from history. Docs writers read many of these in a row, so keep them
 **short, factual and developer-facing**.
 
-The `jcommit:commit` and `jcommit:mr` skills follow these rules every time they
-write a description. Base it on what is actually in the diff
-(`git diff --cached --stat`, then `git diff --cached`), never on the
-conversation alone.
+**The description is generated automatically from the code.** The developer
+doesn't write it or answer questions about it; they only see it before the
+commit. The `jcommit:commit` and `jcommit:mr` skills generate it on every
+commit from these sources, in order:
+
+1. The staged diff: `git diff --cached --stat`, then `git diff --cached`. For a
+   large diff, use the stat plus the key hunks.
+2. What the diff itself says: new or changed public names (widgets,
+   properties, events, APIs, config keys), code comments, test names and
+   assertions.
+3. The Jira issue, when committing against one: its summary and type (Bug,
+   Story…) explain the intent.
+
+Never invent a motivation that none of these show. If the "why" isn't evident,
+describe the behaviour change only.
 
 ## Template
 
@@ -77,6 +88,18 @@ lines between them, so `git log --format='%(trailers)'` can read them.
 Only these values. Never invent a new tab, section or platform name; the release
 notes structure is fixed.
 
+### Deriving the trailers from the code
+
+| Trailer | Signals in the diff |
+| --- | --- |
+| `Release-Note` | New public widget, property, event, API, config key or command → `Features`. Changed default, extended option, performance or UX improvement to something that exists → `Enhancements`. Corrects wrong behaviour (a guard, null check, off-by-one, a regression test reproducing a failure, or a Jira issue of type Bug) → `Bug Fixes`. Only tests, CI, build scripts, refactors, comments or dependency bumps with no visible effect → `None`. |
+| `Release-Area` | Components, widgets, styles, themes, canvas or layout code → `User Interface`. Java/Spring services, controllers, REST APIs, data sources, queries, variables → `Backend`. Agents, Studio shell, build/deploy pipeline, auth, project settings → `Platform`. Docs, samples, Storybook, Marketplace, SDK or CLI → `Product Ecosystem`. Pick by what the app developer sees, not where the code lives. |
+| `Platforms` | Only Angular or React web code → `Web`. Only React Native / mobile code → `Mobile`. Shared runtime or code paths for both → `Web, Mobile`. Server-side or tooling only → leave it out. |
+| `Component` | The widget or feature most of the diff is about, named as the docs name it (e.g. `Table and DataTable`). Leave it out if the change spans several. |
+| `Docs` | Only when the code references a docs URL, or a checkout of the docs repo shows the page exists. Otherwise leave it out. |
+
+When the signals conflict, pick the one an app developer would notice first.
+
 ## Size budget, by Release-Note
 
 | Release-Note | Allowed |
@@ -99,8 +122,8 @@ belongs in the Jira issue or a design doc, not here.
 - Test boilerplate ("added unit tests", "tested locally"). Mention verification
   only if it matters to a reader, e.g. "not yet verified on iOS".
 - Speculation, filler ("This commit…", "As part of…").
-- Anything you can't see in the diff. Ask the user for the "why" instead of
-  guessing.
+- Anything the code or the Jira issue doesn't support: no guessed motivation,
+  platforms or doc pages.
 
 ## Details: writing rules
 

@@ -10,6 +10,7 @@ import { assertGitRepo, requireCurrentBranch, warnIfLongDescription } from './wo
 import { getRepoContext, loadProtectedBranches, printProtectedBranches } from './workflow/protected';
 import { pushAndCreateMergeRequest } from './workflow/mergeRequest';
 import { getLastCommitMessage } from './utils/git';
+import { JiraService } from './services/jira';
 import { GjCommitConfig, ParsedArgs } from './types';
 import { printError, printInfo, printWarning } from './utils/colors';
 
@@ -57,6 +58,42 @@ async function runMrCommand(config: GjCommitConfig, parsed: ParsedArgs): Promise
   );
 }
 
+async function runIssuesCommand(config: GjCommitConfig, parsed: ParsedArgs): Promise<void> {
+  const missing = ['jiraDomain', 'jiraEmail', 'jiraApiToken'].filter(
+    (field) => !config[field as keyof GjCommitConfig]
+  );
+  if (missing.length) {
+    printError(`Listing Jira issues needs: ${missing.join(', ')}. Run: jcommit setup`);
+    process.exit(1);
+  }
+
+  const jira = new JiraService(config);
+  const issues = await jira.getOpenIssues(config.jiraAssigneeId, parsed.limit ?? 50);
+  const rows = issues.map((issue) => ({ ...issue, key: issue.id, url: jira.browseUrl(issue.id) }));
+
+  if (parsed.json) {
+    console.log(JSON.stringify(rows.map(({ key, summary, status, priority, type, url }) => ({
+      key, summary, status, priority, type, url,
+    })), null, 2));
+    return;
+  }
+
+  if (!rows.length) {
+    printInfo('No open Jira issues are assigned to you.');
+    return;
+  }
+  const who = config.jiraAssigneeId ? `account ${config.jiraAssigneeId}` : 'you';
+  printInfo(`Open Jira issues assigned to ${who} (${rows.length}), most recently updated first:`);
+  const keyWidth = Math.max(...rows.map((row) => row.key.length));
+  const statusWidth = Math.max(...rows.map((row) => row.status.length));
+  rows.forEach((row) => {
+    const meta = [row.type, row.priority].filter(Boolean).join(', ');
+    console.log(`  ${row.key.padEnd(keyWidth)}  ${row.status.padEnd(statusWidth)}  ${row.summary}${meta ? `  (${meta})` : ''}`);
+  });
+  console.log('');
+  printInfo('Commit against one with: jcommit -t <KEY> ...');
+}
+
 async function run(): Promise<void> {
 
   const parsed = parseArgs(process.argv.slice(2));
@@ -69,7 +106,7 @@ async function run(): Promise<void> {
     return;
   }
 
-  const isUtilityCommand = parsed.command === 'config' || parsed.command === 'protected' || parsed.command === 'mr';
+  const isUtilityCommand = ['config', 'protected', 'mr', 'issues'].includes(parsed.command ?? '');
 
   // Keep headless output clean and fast — skip the banner and the network update check.
   if (!parsed.headless && !isUtilityCommand) {
@@ -102,6 +139,10 @@ async function run(): Promise<void> {
   }
   if (parsed.command === 'mr') {
     await runMrCommand(config, parsed);
+    return;
+  }
+  if (parsed.command === 'issues') {
+    await runIssuesCommand(config, parsed);
     return;
   }
 

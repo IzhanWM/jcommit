@@ -14,6 +14,7 @@ const steps_1 = require("./workflow/steps");
 const protected_1 = require("./workflow/protected");
 const mergeRequest_1 = require("./workflow/mergeRequest");
 const git_1 = require("./utils/git");
+const jira_1 = require("./services/jira");
 const colors_1 = require("./utils/colors");
 function resolveDescription(parsed) {
     if (parsed.description && parsed.descriptionFile) {
@@ -53,6 +54,36 @@ async function runMrCommand(config, parsed) {
         jiraUrl: jiraKey && config.jiraDomain ? `https://${config.jiraDomain}/browse/${jiraKey}` : null,
     }, { createMr: true, push: parsed.push === true });
 }
+async function runIssuesCommand(config, parsed) {
+    const missing = ['jiraDomain', 'jiraEmail', 'jiraApiToken'].filter((field) => !config[field]);
+    if (missing.length) {
+        (0, colors_1.printError)(`Listing Jira issues needs: ${missing.join(', ')}. Run: jcommit setup`);
+        process.exit(1);
+    }
+    const jira = new jira_1.JiraService(config);
+    const issues = await jira.getOpenIssues(config.jiraAssigneeId, parsed.limit ?? 50);
+    const rows = issues.map((issue) => ({ ...issue, key: issue.id, url: jira.browseUrl(issue.id) }));
+    if (parsed.json) {
+        console.log(JSON.stringify(rows.map(({ key, summary, status, priority, type, url }) => ({
+            key, summary, status, priority, type, url,
+        })), null, 2));
+        return;
+    }
+    if (!rows.length) {
+        (0, colors_1.printInfo)('No open Jira issues are assigned to you.');
+        return;
+    }
+    const who = config.jiraAssigneeId ? `account ${config.jiraAssigneeId}` : 'you';
+    (0, colors_1.printInfo)(`Open Jira issues assigned to ${who} (${rows.length}), most recently updated first:`);
+    const keyWidth = Math.max(...rows.map((row) => row.key.length));
+    const statusWidth = Math.max(...rows.map((row) => row.status.length));
+    rows.forEach((row) => {
+        const meta = [row.type, row.priority].filter(Boolean).join(', ');
+        console.log(`  ${row.key.padEnd(keyWidth)}  ${row.status.padEnd(statusWidth)}  ${row.summary}${meta ? `  (${meta})` : ''}`);
+    });
+    console.log('');
+    (0, colors_1.printInfo)('Commit against one with: jcommit -t <KEY> ...');
+}
 async function run() {
     const parsed = (0, args_1.parseArgs)(process.argv.slice(2));
     if (parsed.help) {
@@ -63,7 +94,7 @@ async function run() {
         await (0, args_1.showVersion)();
         return;
     }
-    const isUtilityCommand = parsed.command === 'config' || parsed.command === 'protected' || parsed.command === 'mr';
+    const isUtilityCommand = ['config', 'protected', 'mr', 'issues'].includes(parsed.command ?? '');
     // Keep headless output clean and fast — skip the banner and the network update check.
     if (!parsed.headless && !isUtilityCommand) {
         (0, colors_1.printInfo)('~ jcommit ~');
@@ -92,6 +123,10 @@ async function run() {
     }
     if (parsed.command === 'mr') {
         await runMrCommand(config, parsed);
+        return;
+    }
+    if (parsed.command === 'issues') {
+        await runIssuesCommand(config, parsed);
         return;
     }
     const missing = (0, config_1.ensureRequiredConfig)(config);

@@ -20,7 +20,7 @@
     "lint": "echo 'No linting configured'",
     "format": "echo 'No formatting configured'",
     "preversion": "npm run test",
-    "version": "npm run build",
+    "version": "npm run build && node scripts/sync-plugin-version.js && git add .claude-plugin/plugin.json dist",
     "postversion": "git push && git push --tags"
   },
   "keywords": [

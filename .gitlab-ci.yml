@@ -5,6 +5,7 @@ dist-up-to-date:
     - npm ci
     - npm run build
     - node dist/index.js --help > /dev/null
+    - node scripts/sync-plugin-version.js --check
     - |
       if [ -n "$(git status --porcelain -- dist)" ]; then
         git status --short -- dist
