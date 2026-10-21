@@ -1,4 +1,65 @@
-import { GjCommitConfig, JiraIssue, JiraCreateRequest, JiraCreateResponse } from '../types';
+import { AdfNode, GjCommitConfig, JiraIssue, JiraCreateRequest, JiraCreateResponse } from '../types';
+
+function textNode(text: string): AdfNode {
+  return { type: 'text', text };
+}
+
+/**
+ * Converts the lightweight markdown jcommit descriptions use (`## Heading`,
+ * `- bullet`, paragraphs) into Atlassian Document Format so the Jira issue keeps
+ * the same structure as the commit body and merge request.
+ */
+export function markdownToAdf(markdown: string): AdfNode[] {
+  const nodes: AdfNode[] = [];
+  let paragraph: string[] = [];
+  let bullets: AdfNode[] = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length) {
+      // Keep line breaks (e.g. `Release-Note:` / `Release-Area:` trailers) instead of reflowing.
+      const content = paragraph.flatMap((line, index) =>
+        index ? [{ type: 'hardBreak' }, textNode(line)] : [textNode(line)]
+      );
+      nodes.push({ type: 'paragraph', content });
+      paragraph = [];
+    }
+  };
+  const flushBullets = () => {
+    if (bullets.length) {
+      nodes.push({ type: 'bulletList', content: bullets });
+      bullets = [];
+    }
+  };
+
+  for (const rawLine of markdown.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    const heading = line.match(/^(#{1,6})\s+(.*)$/);
+    const bullet = line.match(/^[-*]\s+(.*)$/);
+
+    if (!line) {
+      flushParagraph();
+      flushBullets();
+    } else if (heading) {
+      flushParagraph();
+      flushBullets();
+      nodes.push({
+        type: 'heading',
+        attrs: { level: Math.min(heading[1].length + 1, 6) },
+        content: [textNode(heading[2])],
+      });
+    } else if (bullet) {
+      flushParagraph();
+      bullets.push({ type: 'listItem', content: [{ type: 'paragraph', content: [textNode(bullet[1])] }] });
+    } else {
+      flushBullets();
+      paragraph.push(line);
+    }
+  }
+  flushParagraph();
+  flushBullets();
+
+  return nodes.length ? nodes : [{ type: 'paragraph', content: [textNode(markdown.trim() || ' ')] }];
+}
 
 export class JiraService {
   private config: GjCommitConfig;
@@ -42,17 +103,7 @@ export class JiraService {
   async createIssue(summary: string, description: string): Promise<string> {
     const fields: JiraCreateRequest['fields'] = {
       description: {
-        content: [
-          {
-            content: [
-              {
-                text: description,
-                type: 'text',
-              },
-            ],
-            type: 'paragraph',
-          },
-        ],
+        content: markdownToAdf(description),
         type: 'doc',
         version: 1,
       },
@@ -89,6 +140,10 @@ export class JiraService {
       throw new Error('Failed to extract issue key from Jira response.');
     }
     return data.key;
+  }
+
+  browseUrl(issueKey: string): string {
+    return `https://${this.config.jiraDomain}/browse/${issueKey}`;
   }
 
   async getIssue(issueId: string): Promise<JiraIssue> {

@@ -77,3 +77,44 @@ export function createBranchFromBase(baseBranch: string, newBranch: string): boo
   result = runGit(['branch', newBranch, baseBranch], { stdio: 'inherit' });
   return result.status === 0;
 }
+
+export function getRemoteUrl(remote = 'origin'): string {
+  const result = runGit(['remote', 'get-url', remote]);
+  return result.status === 0 ? result.stdout.trim() : '';
+}
+
+export function getRepoRoot(): string {
+  const result = runGit(['rev-parse', '--show-toplevel']);
+  return result.status === 0 ? result.stdout.trim() : '';
+}
+
+export function localBranchExists(branchName: string): boolean {
+  return runGit(['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`]).status === 0;
+}
+
+export function remoteBranchExists(branchName: string, remote = 'origin'): boolean {
+  return runGit(['show-ref', '--verify', '--quiet', `refs/remotes/${remote}/${branchName}`]).status === 0;
+}
+
+/** Creates `branchName` at the current HEAD and switches to it; staged changes carry over. */
+export function createAndSwitchBranch(branchName: string): boolean {
+  const result = runGit(['checkout', '-b', branchName], { stdio: 'inherit' });
+  return result.status === 0;
+}
+
+/** The remote's default branch (e.g. `master`), from the local ref or by asking the remote. */
+export function getRemoteDefaultBranch(remote = 'origin'): string {
+  const local = runGit(['symbolic-ref', '--short', `refs/remotes/${remote}/HEAD`]);
+  if (local.status === 0 && local.stdout.trim()) {
+    return local.stdout.trim().replace(new RegExp(`^${remote}/`), '');
+  }
+  const remoteHead = runGit(['ls-remote', '--symref', remote, 'HEAD'], { timeout: 10000 });
+  const match = remoteHead.stdout.match(/^ref:\s+refs\/heads\/(\S+)\s+HEAD/m);
+  return match ? match[1] : '';
+}
+
+export function getLastCommitMessage(): { subject: string; body: string } {
+  const subject = runGit(['log', '-1', '--format=%s']).stdout.trim();
+  const body = runGit(['log', '-1', '--format=%b']).stdout.trim();
+  return { subject, body };
+}

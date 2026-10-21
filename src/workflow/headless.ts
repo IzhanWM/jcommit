@@ -4,12 +4,14 @@ import { createBranchFromBase, getCurrentBranch, switchBranch } from '../utils/g
 import { JiraService } from '../services/jira';
 import {
   assertGitRepo,
-  assertNotProtected,
   assertStagedChanges,
+  buildCommitMessage,
   commitChanges,
-  pushCurrentBranch,
   requireCurrentBranch,
+  warnIfLongDescription,
 } from './steps';
+import { ensureWorkBranch, loadProtectedBranches } from './protected';
+import { isAutoMrEnabled, pushAndCreateMergeRequest } from './mergeRequest';
 
 const JIRA_KEY_PATTERN = /^[A-Za-z]+-[0-9]+$/;
 
@@ -29,6 +31,11 @@ function validateOptions(options: HeadlessOptions): void {
     process.exit(1);
   }
 
+  if (options.message && /[\r\n]/.test(options.message)) {
+    printError('--message must be a single line (the title). Put details in --description / --description-file.');
+    process.exit(1);
+  }
+
   if (options.createBranch && options.switchBranch) {
     printError('Cannot use --create-branch and --branch together. Choose one branch action.');
     process.exit(1);
@@ -41,6 +48,16 @@ function validateOptions(options: HeadlessOptions): void {
 
   if (options.baseBranch && !options.createBranch) {
     printError('--base only applies to --create-branch. Add --create-branch <name>.');
+    process.exit(1);
+  }
+
+  if (options.mr === true && options.push === false) {
+    printError('--mr needs the branch on the remote. Drop --no-push.');
+    process.exit(1);
+  }
+
+  if (options.targetBranch && options.mr === false) {
+    printError('--target only applies when a merge request is created. Drop --no-mr.');
     process.exit(1);
   }
 }
@@ -72,13 +89,15 @@ function resolveBranch(options: HeadlessOptions, currentBranch: string): string 
   return currentBranch;
 }
 
-async function resolveCommitMessage(
-  jiraService: JiraService,
-  options: HeadlessOptions
-): Promise<string> {
+interface ResolvedIssue {
+  key: string;
+  subject: string;
+}
+
+async function resolveIssue(jiraService: JiraService, options: HeadlessOptions): Promise<ResolvedIssue> {
   if (options.ticket) {
     if (options.message) {
-      return `${options.ticket} | ${options.message}`;
+      return { key: options.ticket, subject: `${options.ticket} | ${options.message}` };
     }
 
     printInfo('Fetching Jira work item details...');
@@ -88,7 +107,7 @@ async function resolveCommitMessage(
       process.exit(1);
     }
     printInfo(`Using ${options.ticket} (${status || 'unknown status'}): ${summary}`);
-    return `${options.ticket} | Fix: ${summary}`;
+    return { key: options.ticket, subject: `${options.ticket} | Fix: ${summary}` };
   }
 
   const summary = options.message as string;
@@ -96,12 +115,17 @@ async function resolveCommitMessage(
   printInfo('Creating Jira work item...');
   const issueKey = await jiraService.createIssue(summary, description);
   printSuccess(`Created Jira work item: ${issueKey}`);
-  return `${issueKey} | ${summary}`;
+  return { key: issueKey, subject: `${issueKey} | ${summary}` };
 }
 
-export async function runHeadless(config: GjCommitConfig, options: HeadlessOptions): Promise<void> {
+export async function runHeadless(
+  config: GjCommitConfig,
+  configPath: string,
+  options: HeadlessOptions
+): Promise<void> {
 
   validateOptions(options);
+  warnIfLongDescription(options.description);
 
   assertGitRepo();
   let currentBranch = requireCurrentBranch();
@@ -110,17 +134,40 @@ export async function runHeadless(config: GjCommitConfig, options: HeadlessOptio
   currentBranch = resolveBranch(options, currentBranch);
 
   assertStagedChanges();
-  assertNotProtected(currentBranch, config);
+
+  const protectedBranches = await loadProtectedBranches(config, configPath, {
+    refresh: options.refreshProtected,
+  });
+  const workBranch = ensureWorkBranch(currentBranch, config, protectedBranches.all);
+  currentBranch = workBranch.branch;
 
   const jiraService = new JiraService(config);
-  const commitMessage = await resolveCommitMessage(jiraService, options);
+  const issue = await resolveIssue(jiraService, options);
 
-  commitChanges(commitMessage);
+  commitChanges(buildCommitMessage(issue.subject, options.description));
 
-  if (options.push) {
-    pushCurrentBranch();
+  const createMr = options.mr ?? isAutoMrEnabled(config);
+  const push = options.push === true || options.mr === true;
+
+  if (push) {
+    await pushAndCreateMergeRequest(
+      config,
+      {
+        sourceBranch: currentBranch,
+        targetBranch: options.targetBranch,
+        baseBranch: workBranch.protectedBase || options.baseBranch,
+        title: issue.subject,
+        description: options.description || issue.subject,
+        jiraKey: issue.key,
+        jiraUrl: jiraService.browseUrl(issue.key),
+      },
+      { createMr, push }
+    );
   } else {
     printInfo('Commit was not pushed to remote. Pass --push to push.');
+    if (createMr) {
+      printInfo('Merge request not created because the branch was not pushed. Pass --push or --mr.');
+    }
   }
 
   printSuccess('Committed successfully!');

@@ -1,7 +1,5 @@
-import { GjCommitConfig } from '../types';
-import { printError, printInfo, printSuccess } from '../utils/colors';
+import { printError, printInfo, printSuccess, printWarning } from '../utils/colors';
 import { runGit, getCurrentBranch } from '../utils/git';
-import { getDefaultProtectedBranches } from '../config/config';
 
 /**
  * Shared, non-interactive workflow steps used by both the interactive and the
@@ -34,27 +32,32 @@ export function assertStagedChanges(): void {
   }
 }
 
-export function resolveProtectedBranches(config: GjCommitConfig): string[] {
-  return Array.isArray(config.protectedBranches) && config.protectedBranches.length
-    ? config.protectedBranches
-    : getDefaultProtectedBranches();
-}
-
-export function assertNotProtected(branch: string, config: GjCommitConfig): void {
-  if (resolveProtectedBranches(config).includes(branch)) {
-    printError(`Operation cancelled. '${branch}' is protected.`);
-    process.exit(1);
+/**
+ * Builds the full commit message: the `KEY | title` subject line, then the
+ * structured description as the body (skipped when it only repeats the title).
+ */
+export function buildCommitMessage(subject: string, body?: string | null): string {
+  const trimmedBody = (body || '').trim();
+  const title = subject.replace(/^[A-Za-z]+-[0-9]+ \| /, '').trim();
+  if (!trimmedBody || trimmedBody === title) {
+    return subject;
   }
+  return `${subject}\n\n${trimmedBody}`;
 }
 
 export function commitChanges(commitMessage: string): void {
   printInfo('Committing...');
-  const commitResult = runGit(['commit', '-m', commitMessage], { stdio: 'inherit' });
+  // Pass the message on stdin so multi-line markdown bodies survive intact;
+  // `whitespace` cleanup keeps `## Heading` lines that `strip` would drop.
+  const commitResult = runGit(['commit', '--cleanup=whitespace', '-F', '-'], {
+    input: commitMessage,
+    stdio: ['pipe', 'inherit', 'inherit'],
+  });
   if (commitResult.status !== 0) {
     printError('Git commit failed');
     process.exit(1);
   }
-  printSuccess(`Git commit successful with message: ${commitMessage}`);
+  printSuccess(`Git commit successful with message: ${commitMessage.split('\n')[0]}`);
 }
 
 export function pushCurrentBranch(): void {
@@ -68,4 +71,25 @@ export function pushCurrentBranch(): void {
     process.exit(1);
   }
   printSuccess('Git push successful');
+}
+
+const DESCRIPTION_MAX_LINES = 15;
+const DESCRIPTION_MAX_CHARS = 1200;
+
+/**
+ * Descriptions feed developer docs, so they should stay short. Long ones are
+ * allowed but flagged (a warning, not an error, so commits are never blocked).
+ */
+export function warnIfLongDescription(description: string | null): void {
+  if (!description) {
+    return;
+  }
+  const lines = description.trim().split('\n').length;
+  const chars = description.trim().length;
+  if (lines > DESCRIPTION_MAX_LINES || chars > DESCRIPTION_MAX_CHARS) {
+    printWarning(
+      `Description is long (${lines} lines, ${chars} chars; aim for ≤ ${DESCRIPTION_MAX_LINES} lines / ` +
+        `${DESCRIPTION_MAX_CHARS} chars). Keep only developer-visible facts, or split the commit.`
+    );
+  }
 }

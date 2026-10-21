@@ -7,12 +7,13 @@ import { JiraService } from '../services/jira';
 import { readConfig, writeConfig, ensureRequiredConfig, getDefaultProtectedBranches } from '../config/config';
 import {
   assertGitRepo,
-  assertNotProtected,
   assertStagedChanges,
+  buildCommitMessage,
   commitChanges,
-  pushCurrentBranch,
   requireCurrentBranch,
 } from './steps';
+import { ensureWorkBranch, loadProtectedBranches } from './protected';
+import { isAutoMrEnabled, pushAndCreateMergeRequest } from './mergeRequest';
 
 export async function runSetup(configPath: string): Promise<void> {
   const existingConfig = readConfig(configPath) || {} as Partial<GjCommitConfig>;
@@ -67,6 +68,37 @@ This interactive setup will create or update your jcommit configuration for Jira
       defaultValue: (existingConfig.protectedBranches || getDefaultProtectedBranches()).join(','),
     }
   );
+  const branchPrefix = await promptInput(
+    rl,
+    'Prefix for auto-created branches when committing on a protected branch (<prefix>/<branch>)',
+    { defaultValue: existingConfig.branchPrefix || jiraEmail.split('@')[0] }
+  );
+
+  const existingGitlab = existingConfig.gitlab || {};
+  let gitlab = existingConfig.gitlab;
+  if (await promptYesNo(rl, 'Configure GitLab (protected-branch detection & merge requests)?')) {
+    const gitlabUrl = await promptInput(rl, 'GitLab URL (blank = use the host of the origin remote)', {
+      defaultValue: existingGitlab.url,
+    });
+    const gitlabToken = await promptSecret(
+      rl,
+      'GitLab personal access token with `api` scope (blank = use $GITLAB_TOKEN)',
+      { allowEmpty: true, hasExisting: Boolean(existingGitlab.token) }
+    );
+    const autoCreateMr = await promptYesNo(rl, 'Automatically create a merge request after pushing?');
+    const defaultTargetBranch = await promptInput(
+      rl,
+      'Default MR target branch (blank = branch you started from, else the project default)',
+      { defaultValue: existingGitlab.defaultTargetBranch }
+    );
+    gitlab = {
+      ...existingGitlab,
+      url: gitlabUrl || undefined,
+      token: gitlabToken || existingGitlab.token || undefined,
+      autoCreateMr,
+      defaultTargetBranch: defaultTargetBranch || undefined,
+    };
+  }
   rl.close();
 
   const protectedBranches = protectedBranchesRaw
@@ -83,6 +115,8 @@ This interactive setup will create or update your jcommit configuration for Jira
     jiraProjectId,
     jiraIssueTypeId,
     protectedBranches,
+    branchPrefix: branchPrefix || undefined,
+    gitlab,
   };
 
   const missing = ensureRequiredConfig(updatedConfig);
@@ -95,7 +129,7 @@ This interactive setup will create or update your jcommit configuration for Jira
   printSuccess('Config saved. You can now use jcommit command.');
 }
 
-export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
+export async function mainWorkflow(config: GjCommitConfig, configPath: string): Promise<void> {
 
   printSuccess('Hi, ' + config.jiraEmail.split('@')[0]);
 
@@ -104,6 +138,7 @@ export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
   assertGitRepo();
 
   let currentBranch = requireCurrentBranch();
+  let baseBranchForMr: string | null = null;
 
   printInfo(`You are on branch:`);
   printWarning(`${currentBranch}`);
@@ -141,6 +176,7 @@ export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
     }
 
     currentBranch = newBranchName;
+    baseBranchForMr = baseBranch;
     printSuccess(`Created and switched to branch '${newBranchName}' from '${baseBranch}'`);
   } else if (normalizedAction === 's' || normalizedAction === 'switch') {
     printInfo('Available local branches:');
@@ -165,7 +201,10 @@ export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
 
   assertStagedChanges();
 
-  assertNotProtected(currentBranch, config);
+  const protectedBranches = await loadProtectedBranches(config, configPath);
+  const workBranch = ensureWorkBranch(currentBranch, config, protectedBranches.all);
+  currentBranch = workBranch.branch;
+  baseBranchForMr = workBranch.protectedBase || baseBranchForMr;
 
   const jiraService = new JiraService(config);
 
@@ -186,6 +225,8 @@ export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
 
   let summary = userInput;
   let commitMessage = '';
+  let commitBody = '';
+  let issueKey = '';
   let skipJiraCreation = false;
 
   if (/^[A-Za-z]+-[0-9]+$/.test(userInput)) {
@@ -209,12 +250,14 @@ export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
           )
         ) {
           commitMessage = `${jiraTicket} | Fix: ${jiraSummary}`;
+          issueKey = jiraTicket;
           skipJiraCreation = true;
         } else {
           const customSummary = await promptInput(rl, 'Enter custom commit message', {
             required: true,
           });
           commitMessage = `${jiraTicket} | ${customSummary}`;
+          issueKey = jiraTicket;
           skipJiraCreation = true;
         }
       } else {
@@ -230,10 +273,11 @@ export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
   if (!skipJiraCreation) {
     const descriptionInput = await promptInput(rl, 'Provide a detailed description (or \'n\' to skip & use summary)');
     const description = /^(n|N)$/.test(descriptionInput) ? summary : descriptionInput || summary;
+    commitBody = description;
 
     printInfo('Creating Jira work item...');
     try {
-      const issueKey = await jiraService.createIssue(summary, description);
+      issueKey = await jiraService.createIssue(summary, description);
       printSuccess(`Created Jira work item: ${issueKey}`);
       commitMessage = `${issueKey} | ${summary}`;
     } catch (error) {
@@ -246,18 +290,34 @@ export async function mainWorkflow(config: GjCommitConfig): Promise<void> {
 
   rl.close();
 
-  commitChanges(commitMessage);
+  commitChanges(buildCommitMessage(commitMessage, commitBody));
 
   const rlPush = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
   });
-  if (await promptYesNo(rlPush, 'Push changes to the remote repository now? [y]es or [n]o: ')) {
-    pushCurrentBranch();
+  const autoMr = isAutoMrEnabled(config);
+  const pushQuestion = autoMr
+    ? 'Push changes and create a GitLab merge request now? [y]es or [n]o: '
+    : 'Push changes to the remote repository now? [y]es or [n]o: ';
+  const pushed = await promptYesNo(rlPush, pushQuestion);
+  rlPush.close();
+  if (pushed) {
+    await pushAndCreateMergeRequest(
+      config,
+      {
+        sourceBranch: currentBranch,
+        baseBranch: baseBranchForMr,
+        title: commitMessage,
+        description: commitBody || commitMessage,
+        jiraKey: issueKey || null,
+        jiraUrl: issueKey ? jiraService.browseUrl(issueKey) : null,
+      },
+      { createMr: autoMr, push: true }
+    );
   } else {
     printInfo('Commit was not pushed to remote.');
   }
-  rlPush.close();
 
   printSuccess('Committed successfully!');
 }

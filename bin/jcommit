@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Plugin entry point: Claude Code puts the plugin's bin/ on the Bash tool's PATH.
+# Runs the CLI bundled with the plugin (dist/ is committed, no install step).
+DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec node "$DIR/../dist/index.js" "$@"

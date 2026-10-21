@@ -1,0 +1,13 @@
+# The Claude Code plugin runs the committed dist/ directly, so it must match src/.
+dist-up-to-date:
+  image: node:20
+  script:
+    - npm ci
+    - npm run build
+    - node dist/index.js --help > /dev/null
+    - |
+      if [ -n "$(git status --porcelain -- dist)" ]; then
+        git status --short -- dist
+        echo "dist/ is out of date: run 'npm run build' and commit dist/."
+        exit 1
+      fi
