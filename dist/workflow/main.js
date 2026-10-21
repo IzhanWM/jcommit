@@ -158,9 +158,7 @@ async function mainWorkflow(config, configPath) {
     currentBranch = workBranch.branch;
     baseBranchForMr = workBranch.protectedBase || baseBranchForMr;
     const jiraService = new jira_1.JiraService(config);
-    const openIssues = config.jiraAssigneeId
-        ? await jiraService.getOpenIssues(config.jiraEmail, config.jiraAssigneeId)
-        : await jiraService.getOpenIssues(config.jiraEmail);
+    const openIssues = await jiraService.getOpenIssues(config.jiraAssigneeId);
     if (openIssues.length > 0) {
         console.log('');
         (0, colors_1.printInfo)('You have the following open Jira Work items:');

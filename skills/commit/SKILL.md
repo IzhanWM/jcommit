@@ -53,18 +53,20 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
      `<branchPrefix>/<branch>` from it and commits there — tell the user that
      will happen; no action needed.
 
-2. **Read the change** — never write from the conversation alone:
-   `git diff --cached --stat`, then `git diff --cached` (for large diffs, the
-   stat plus the key hunks). Also `git log -5 --format=%s` for local style.
+2. **Read the change.** The title and description are generated from the
+   code, not from the conversation: `git diff --cached --stat`, then
+   `git diff --cached` (for large diffs, the stat plus the key hunks). Also run
+   `git log -5 --format=%s` for local style.
 
 3. **Pick the Jira mode**
    | Situation | Flags |
    | --- | --- |
    | User gave a ticket key | `-t KEY -m "<title>"` (or `-t KEY` alone to reuse the Jira summary as `Fix: <summary>`). Pass the description with `-F -` either way. |
-   | No ticket — create one | `-m "<title>"` — **creates a real Jira issue**; confirm first |
+   | No key given | Run `jcommit issues --json` and compare the user's open issues with the diff. If one clearly matches, propose it (`-t KEY`). Otherwise list them briefly and ask which one to use, or whether to create a new issue. In a non-interactive run, use a clear match; if there's none, create a new issue only if the prompt asked for that, otherwise stop and say so. |
+   | Create a new issue | `-m "<title>"` — **creates a real Jira issue**; confirm first |
 
-4. **Write the title and description. Always do this; never commit without a
-   description.** Read [references/description.md](references/description.md)
+4. **Generate the title and description from the code. Always do this; never
+   commit without a description, and don't ask the user to write it.** Read [references/description.md](references/description.md)
    for the full rules and examples. The essentials:
    - Title (`-m`): one line, about 50–72 characters, imperative, outcome-level,
      naming the WaveMaker feature.
@@ -84,8 +86,8 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
    - No file lists, implementation narration, test boilerplate, repeated title
      or "None" sections.
 
-   Show the title and description to the user and let them adjust before
-   committing.
+   Show the generated title and description to the user before committing;
+   they can ask for changes.
 
 5. **Decide push / MR** — check `jcommit config get gitlab.autoCreateMr`.
    - Default is commit only (no push).
@@ -139,7 +141,8 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
 | `--refresh-protected` | Re-detect protected branches from GitLab before committing |
 | `-c`, `--config <path>` | Custom config file |
 
-Other commands: `jcommit protected [--refresh]` (show/re-detect protected
+Other commands: `jcommit issues [--json] [--limit <n>]` (the user's open Jira
+issues), `jcommit protected [--refresh]` (show/re-detect protected
 branches for this repo), `jcommit mr [--target <b>] [--push]` (open an MR for
 the current branch from its last commit), `jcommit config list|get|set|unset|path`.
 

@@ -23,8 +23,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
     targetBranch: null,
     refreshProtected: false,
     descriptionFile: null,
+    json: false,
+    limit: null,
   };
-  const validCommands = ['setup', 'config', 'protected', 'mr'];
+  const validCommands = ['setup', 'config', 'protected', 'mr', 'issues'];
 
   while (args.length) {
     const raw = args.shift();
@@ -75,6 +77,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
       parsed.targetBranch = takeValue();
     } else if (current === '--refresh-protected' || current === '--refresh') {
       parsed.refreshProtected = true;
+    } else if (current === '--json') {
+      parsed.json = true;
+    } else if (current === '--limit') {
+      const limit = Number(takeValue());
+      if (!Number.isInteger(limit) || limit < 1) {
+        printError('--limit expects a positive whole number.');
+        parsed.help = true;
+      } else {
+        parsed.limit = limit;
+      }
     } else if (current.startsWith('-')) {
       printError(`Unknown option: '${current}'`);
       parsed.help = true;
@@ -115,6 +127,7 @@ Commands:
                       (configure Jira, GitLab and branch rules)
   config <action>     Non-interactive config: list | get <key> | set <key> <value>
                       | unset <key> | path   (dotted keys, e.g. gitlab.autoCreateMr)
+  issues              List your open Jira issues (--json, --limit <n>)
   protected           Show protected branches for this repo (--refresh re-detects)
   mr                  Create a GitLab merge request for the current pushed branch
                       (--target <branch>)

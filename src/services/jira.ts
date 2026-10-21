@@ -97,6 +97,7 @@ export class JiraService {
       summary: issue?.fields?.summary || '',
       status: issue?.fields?.status?.name || '',
       priority: issue?.fields?.priority?.name || '',
+      type: issue?.fields?.issuetype?.name || '',
     };
   }
 
@@ -154,31 +155,35 @@ export class JiraService {
     return this.toJiraIssue(data);
   }
 
-  async getOpenIssues(jiraEmail: string, jiraAssigneeId?: string): Promise<JiraIssue[]> {
-  const assignee = jiraAssigneeId ? `"${jiraAssigneeId}"` : `"${jiraEmail}"`;
-  
-  const jql = `assignee = ${assignee} AND resolution = Unresolved AND status in ("Open","Reopened", "To Do", "In Progress") ORDER BY created ASC`;
+  /**
+   * Unresolved issues assigned to `jiraAssigneeId`, or to the token's own user
+   * (`currentUser()`) when no assignee is configured. Uses the status category
+   * so custom workflow states (e.g. "In Review") are included.
+   */
+  async getOpenIssues(jiraAssigneeId?: string, limit = 100): Promise<JiraIssue[]> {
+    const assignee = jiraAssigneeId ? `"${jiraAssigneeId}"` : 'currentUser()';
+    const jql = `assignee = ${assignee} AND statusCategory != Done ORDER BY updated DESC`;
 
-  const response = await fetch(`https://${this.config.jiraDomain}/rest/api/3/search/jql`, {
-    method: 'POST', 
-    headers: {
-      ...this.getAuthHeaders(),
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      jql: jql,
-      fields: ['summary', 'status'],
-      maxResults: 100,
-    }),
-  });
+    const response = await fetch(`https://${this.config.jiraDomain}/rest/api/3/search/jql`, {
+      method: 'POST',
+      headers: {
+        ...this.getAuthHeaders(),
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jql,
+        fields: ['summary', 'status', 'priority', 'issuetype'],
+        maxResults: limit,
+      }),
+    });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text || 'Failed to fetch open issues via search/jql.');
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || 'Failed to fetch open issues via search/jql.');
+    }
+
+    const data = await response.json();
+    return data.issues?.map((issue: any) => this.toJiraIssue(issue)) || [];
   }
-
-  const data = await response.json();
-  return data.issues?.map((issue: any) => this.toJiraIssue(issue)) || [];
-}
 }

@@ -13,8 +13,9 @@ the commit title and a structured description) and as a standalone **CLI**.
   (tab, section, Web/Mobile platform, doc link). The same text
   becomes the Jira description and the MR description, so app developer docs
   and release notes can be built straight from history.
-- **Jira integration.** Reference an existing work item or create one (with
-  assignee).
+- **Jira integration.** See your open assigned issues, commit against one, or
+  create a new one (with assignee). If you don't give a key, Claude matches the
+  diff to one of your open issues.
 - **Protected-branch safety.** jcommit detects protected branches from GitLab
   (wildcards like `release-*` included) and stores them per repository. When you
   commit on a protected branch, it moves your staged work to a new branch
@@ -79,6 +80,7 @@ node <plugin-dir>/dist/index.js setup
 | Command | What it does |
 | --- | --- |
 | `/jcommit:commit [KEY] [--push] [--mr]` | Reads the staged diff, drafts the title and documentation-ready description, shows them to you, then commits (and pushes and opens an MR if asked or configured). Claude also picks this up from plain requests like *"commit this against WMS-123 and raise an MR"*. |
+| `/jcommit:issues [filter]` | Shows your open Jira issues (key, status, type, priority, summary), or ask *"what Jira issues are assigned to me?"*. |
 | `/jcommit:mr [--target <branch>]` | Opens a GitLab MR for work that's already committed. |
 | `/jcommit:setup` | Creates or changes the configuration. |
 
@@ -89,9 +91,10 @@ pushing, or opening an MR.
 
 1. Stage your work: `git add <files>`.
 2. Ask Claude: `/jcommit:commit WMS-123 --push`, or just *"commit this against
-   WMS-123 and push"*. Leave out the key to have a new Jira issue created.
-3. Claude reads the staged diff and shows you the title and a short
-   description. Adjust it if needed, then confirm.
+   WMS-123 and push"*. If you leave out the key, Claude checks your open Jira
+   issues for one that matches the change, or offers to create a new one.
+3. Claude generates the title and a short description from the code; you
+   don't write them. It shows them to you, and you confirm or ask for changes.
 4. jcommit commits as `WMS-123 | <title>` with the description as the body. If
    you were on a protected branch, it first moves the work to
    `<name>/<branch>`. It then pushes and, if `gitlab.autoCreateMr` is on (or you
@@ -150,6 +153,12 @@ skill:
 | `Component:` | Optional grouping heading, e.g. `Table and DataTable` |
 | `Docs:` | Optional `/docs/...` link, only for a page that exists |
 | `## Details`, `## Upgrade notes` | Material for the linked doc page and migration notes |
+
+The description is generated from the code: the staged diff, the names,
+comments and tests in it, and the Jira issue's summary and type. Claude also
+works out the tags from the diff, for example React Native-only code →
+`Platforms: Mobile`, or a guard plus a regression test → `Bug Fixes`. It never
+guesses a motivation or a doc page the code doesn't show.
 
 Descriptions are deliberately short. Only `## Summary` and `Release-Note:` are
 always present; the rest appear when they carry information. Length follows
@@ -298,12 +307,88 @@ Other commands:
 
 | Command | Description |
 | --- | --- |
+| `jcommit issues [--json] [--limit <n>]` | List your open Jira issues, most recently updated first |
 | `jcommit protected [--refresh]` | Show (or re-detect) this repo's protected branches |
 | `jcommit mr [--target <b>] [--push]` | Open an MR for the current branch from its last commit |
 | `jcommit config …` | Edit the configuration without prompts |
 
 On missing or conflicting input, headless mode prints a clear error and exits
 non-zero instead of waiting on a prompt.
+
+## Updating
+
+### From jcommit 1.x (npm CLI)
+
+1. Update the CLI with `npm install -g jcommit@latest` once 2.x is published to
+   npm. Until then, use a clone: `git pull && npm install -g .`
+2. Optionally, add the [Claude Code plugin](#claude-code-plugin), which works
+   alongside the CLI and doesn't need it.
+
+Your existing `~/.jcommit.json` keeps working, because every new setting is
+optional. Run `jcommit setup` again (or use `/jcommit:setup`) to add GitLab and
+the branch prefix. What changes after upgrading:
+
+| Before (1.x) | Now (2.x) |
+| --- | --- |
+| Committing on a protected branch aborts | Work moves to `<name>/<branch>` and is committed there. Set `autoBranchOnProtected` to `false` to keep aborting. |
+| Protected branches come only from config | Config, plus branches detected from GitLab or the remote default branch, cached in the config file |
+| `-d` only sets a new Jira issue's description | `-d` / `-F` is also the commit body and the MR description |
+| Open-issue list: assignee by email; Open, Reopened, To Do and In Progress only | Assignee by `jiraAssigneeId` or the token's user; every status that isn't done, most recently updated first |
+
+### Plugin updates
+
+Auto-update is **off** by default for this marketplace. Turn it on once:
+`/plugin` → **Marketplaces** → `jcommit` → **Enable auto-update**. Claude
+Code then fetches new versions in the background and loads them in your next
+session.
+
+To update manually:
+
+```sh
+claude plugin marketplace update jcommit
+claude plugin update jcommit@jcommit
+```
+
+Or, in a session, use `/plugin` → **Installed** → `jcommit` → **Update now**.
+Start a new session or run `/reload-plugins` to load the new version.
+
+### Rolling it out to a team
+
+Commit this to a project's `.claude/settings.json` so everyone who opens the
+repo in Claude Code gets the plugin, kept up to date:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "jcommit": {
+      "source": { "source": "github", "repo": "IzhanWM/jcommit" },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "jcommit@jcommit": true
+  }
+}
+```
+
+For the GitLab mirror, run
+`claude plugin marketplace add https://gitlab.wavemaker.com/<group>/jcommit.git --scope project`
+once, then `claude plugin install jcommit@jcommit --scope project`, and commit
+the `.claude/settings.json` they write. Claude Code applies these settings only
+after the folder is trusted. Cloud sessions don't pick them up.
+
+### Releasing (maintainers)
+
+Installed plugins only update when the **version changes**. Pushing commits
+without a version bump reaches no one. Release with:
+
+```sh
+npm version patch   # or minor / major
+```
+
+This rebuilds `dist/`, sets the same version in `package.json` and
+`.claude-plugin/plugin.json`, commits, tags and pushes. CI fails if the two
+versions differ. Also run `npm publish` so CLI users get the release.
 
 ## Development
 
@@ -327,6 +412,7 @@ CI (`.gitlab-ci.yml`) fails if `dist/` is stale. Check the plugin with
 bin/jcommit            # added to Claude's PATH when the plugin is enabled
 skills/
 ├── commit/            # /jcommit:commit (+ references/description.md: description rules)
+├── issues/            # /jcommit:issues
 ├── mr/                # /jcommit:mr
 └── setup/             # /jcommit:setup
 src/

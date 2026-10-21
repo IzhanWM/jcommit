@@ -65,6 +65,8 @@ export interface ParsedArgs {
   mr: boolean | null;
   targetBranch: string | null;
   refreshProtected: boolean;
+  json: boolean;
+  limit: number | null;
 }
 
 export interface HeadlessOptions {
@@ -85,6 +87,7 @@ export interface JiraIssue {
   summary: string;
   status: string;
   priority: string;
+  type: string;
 }
 
 export interface AdfNode {
