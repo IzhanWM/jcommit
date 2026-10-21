@@ -1,7 +1,8 @@
 import readline from 'readline/promises';
 import { GjCommitConfig } from '../types';
 import { printInfo, printSuccess, printError, printWarning } from '../utils/colors';
-import { listRemoteBranches, listLocalBranches, switchBranch, createBranchFromBase, getCurrentBranch } from '../utils/git';
+import { listRemoteBranches, listLocalBranches, switchBranch, getCurrentBranch } from '../utils/git';
+import { createBranchFromBaseInteractive, LocalBaseChoice } from './baseBranch';
 import { promptInput, promptSecret, promptYesNo } from '../utils/prompts';
 import { JiraService } from '../services/jira';
 import { readConfig, writeConfig, ensureRequiredConfig, getDefaultProtectedBranches } from '../config/config';
@@ -163,21 +164,28 @@ export async function mainWorkflow(config: GjCommitConfig, configPath: string): 
     const baseBranch = await promptInput(rl, 'Name of the source/base branch', { required: true });
     const newBranchName = await promptInput(rl, 'Name for the new branch', { required: true });
 
-    if (!createBranchFromBase(baseBranch, newBranchName)) {
-      rl.close();
-      printError(`Failed to create branch '${newBranchName}' from '${baseBranch}'`);
-      process.exit(1);
-    }
-
-    if (!switchBranch(newBranchName)) {
-      rl.close();
-      printError(`Failed to switch to newly created branch '${newBranchName}'`);
-      process.exit(1);
-    }
+    await createBranchFromBaseInteractive(baseBranch, newBranchName, async (message): Promise<LocalBaseChoice> => {
+      printWarning(message);
+      while (true) {
+        const answer = (
+          await promptInput(
+            rl,
+            `How should '${newBranchName}' be created? [l]ocal '${baseBranch}' as-is, [p]ush '${baseBranch}' to origin first, [c]ancel`,
+            { required: true }
+          )
+        ).toLowerCase();
+        if (answer === 'l' || answer === 'local') return 'local';
+        if (answer === 'p' || answer === 'push') return 'push';
+        if (answer === 'c' || answer === 'cancel') {
+          rl.close();
+          return 'cancel';
+        }
+        printWarning('Please answer l, p or c.');
+      }
+    });
 
     currentBranch = newBranchName;
     baseBranchForMr = baseBranch;
-    printSuccess(`Created and switched to branch '${newBranchName}' from '${baseBranch}'`);
   } else if (normalizedAction === 's' || normalizedAction === 'switch') {
     printInfo('Available local branches:');
     listLocalBranches().forEach((branch) => console.log(`  - ${branch}`));

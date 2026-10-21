@@ -296,7 +296,8 @@ jcommit -m "Add cache layer" --create-branch feat/cache --base main
 | `-F`, `--description-file <path\|->` | Read the description from a file or stdin |
 | `-b`, `--branch <name>` | Switch to an existing branch first |
 | `--create-branch <name>` | Create a new branch (requires `--base`) |
-| `--base <name>` | Base branch for `--create-branch` |
+| `--base <name>` | Base branch for `--create-branch` (taken from `origin/<name>` when the remote has it) |
+| `--local-base` / `--push-base` | When the base exists only locally: branch from the local copy as-is, or push it to origin first. Without either, headless mode stops and names both options; the interactive CLI and Claude ask you. |
 | `--push` / `--no-push` | Push after committing (default: no push) |
 | `--mr` / `--no-mr` | Force or suppress the GitLab MR (`--mr` implies `--push`) |
 | `--target <branch>` | MR target branch |

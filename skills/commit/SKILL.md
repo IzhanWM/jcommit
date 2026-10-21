@@ -134,7 +134,8 @@ Below, `jcommit` is shorthand for that command. **Always run it headless**
 | `-d`, `--description <text>` | Description (commit body, new Jira issue description, MR description) |
 | `-F`, `--description-file <path\|->` | Read the description from a file or stdin (`-`) — preferred |
 | `-b`, `--branch <name>` | Switch to an existing branch before committing |
-| `--create-branch <name> --base <b>` | Create a branch from `<b>` first |
+| `--create-branch <name> --base <b>` | Create a branch from `<b>` first (from `origin/<b>` when the remote has it) |
+| `--local-base` / `--push-base` | Only when `<b>` exists locally but not on origin: branch from the local copy as-is, or push `<b>` to origin first. Pass one only after the user chooses. |
 | `--push` / `--no-push` | Push after commit (default: no push) |
 | `--mr` / `--no-mr` | Force / suppress the GitLab MR (default: `gitlab.autoCreateMr` when pushed) |
 | `--target <branch>` | MR target branch |
@@ -151,6 +152,8 @@ the current branch from its last commit), `jcommit config list|get|set|unset|pat
 | Symptom | Cause / fix |
 | --- | --- |
 | `No staged changes found.` | Stage files first. |
+| `Base branch '<b>' exists only locally` / `Could not fetch '<b>' from origin` | Nothing was created. Ask the user (AskUserQuestion) whether to branch from their local `<b>` as-is (`--local-base`), push `<b>` to origin first (`--push-base`, which publishes that branch), or cancel. Then rerun the same command with their choice. In a non-interactive run, stop and report the two options. |
+| `Base branch '<b>' was not found locally or on origin` | Check the name with `git branch -a`. |
 | `Description is long (…)` | Warning only. Trim it to the budget in references/description.md, or split the commit. |
 | `Operation cancelled. '<b>' is protected.` | `autoBranchOnProtected` is `false`; switch branch or `jcommit config unset autoBranchOnProtected`. |
 | `Config not found` / `configuration is incomplete` | Run the `jcommit:setup` skill. |

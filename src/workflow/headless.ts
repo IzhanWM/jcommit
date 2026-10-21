@@ -1,6 +1,7 @@
 import { GjCommitConfig, HeadlessOptions } from '../types';
 import { printError, printInfo, printSuccess } from '../utils/colors';
-import { createBranchFromBase, getCurrentBranch, switchBranch } from '../utils/git';
+import { getCurrentBranch, switchBranch } from '../utils/git';
+import { createBranchFromBaseInteractive } from './baseBranch';
 import { JiraService } from '../services/jira';
 import {
   assertGitRepo,
@@ -46,6 +47,11 @@ function validateOptions(options: HeadlessOptions): void {
     process.exit(1);
   }
 
+  if (options.localBase && !options.createBranch) {
+    printError(`--${options.localBase}-base only applies to --create-branch <name> --base <branch>.`);
+    process.exit(1);
+  }
+
   if (options.baseBranch && !options.createBranch) {
     printError('--base only applies to --create-branch. Add --create-branch <name>.');
     process.exit(1);
@@ -62,18 +68,21 @@ function validateOptions(options: HeadlessOptions): void {
   }
 }
 
-function resolveBranch(options: HeadlessOptions, currentBranch: string): string {
+async function resolveBranch(options: HeadlessOptions, currentBranch: string): Promise<string> {
   if (options.createBranch) {
     const base = options.baseBranch as string;
-    if (!createBranchFromBase(base, options.createBranch)) {
-      printError(`Failed to create branch '${options.createBranch}' from '${base}'`);
-      process.exit(1);
-    }
-    if (!switchBranch(options.createBranch)) {
-      printError(`Failed to switch to newly created branch '${options.createBranch}'`);
-      process.exit(1);
-    }
-    printSuccess(`Created and switched to branch '${options.createBranch}' from '${base}'`);
+    // Headless can't ask, so a local-only base needs an explicit --local-base / --push-base.
+    await createBranchFromBaseInteractive(base, options.createBranch, async (message) => {
+      if (options.localBase) {
+        return options.localBase;
+      }
+      printError(message);
+      printError(
+        'Re-run with --local-base to branch from the local copy as-is, ' +
+          `or --push-base to push '${base}' to origin first and branch from it.`
+      );
+      return process.exit(1);
+    });
     return options.createBranch;
   }
 
@@ -131,7 +140,7 @@ export async function runHeadless(
   let currentBranch = requireCurrentBranch();
   printInfo(`Branch: ${currentBranch}`);
 
-  currentBranch = resolveBranch(options, currentBranch);
+  currentBranch = await resolveBranch(options, currentBranch);
 
   assertStagedChanges();
 

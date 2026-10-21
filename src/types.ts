@@ -67,6 +67,8 @@ export interface ParsedArgs {
   refreshProtected: boolean;
   json: boolean;
   limit: number | null;
+  /** How to use a base branch that exists only locally: `local` (as-is) or `push` (push it first). */
+  localBase: 'local' | 'push' | null;
 }
 
 export interface HeadlessOptions {
@@ -80,6 +82,7 @@ export interface HeadlessOptions {
   mr: boolean | null;
   targetBranch: string | null;
   refreshProtected: boolean;
+  localBase: 'local' | 'push' | null;
 }
 
 export interface JiraIssue {

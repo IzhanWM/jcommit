@@ -148,6 +148,7 @@ async function run() {
             mr: parsed.mr,
             targetBranch: parsed.targetBranch,
             refreshProtected: parsed.refreshProtected,
+            localBase: parsed.localBase,
         });
         return;
     }

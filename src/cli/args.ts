@@ -25,6 +25,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
     descriptionFile: null,
     json: false,
     limit: null,
+    localBase: null,
   };
   const validCommands = ['setup', 'config', 'protected', 'mr', 'issues'];
 
@@ -77,6 +78,13 @@ export function parseArgs(argv: string[]): ParsedArgs {
       parsed.targetBranch = takeValue();
     } else if (current === '--refresh-protected' || current === '--refresh') {
       parsed.refreshProtected = true;
+    } else if (current === '--local-base' || current === '--push-base') {
+      const choice = current === '--local-base' ? 'local' : 'push';
+      if (parsed.localBase && parsed.localBase !== choice) {
+        printError('Use either --local-base or --push-base, not both.');
+        parsed.help = true;
+      }
+      parsed.localBase = choice;
     } else if (current === '--json') {
       parsed.json = true;
     } else if (current === '--limit') {
@@ -150,6 +158,8 @@ Headless mode (no prompts — for CI, scripts, and git hooks):
   -b, --branch <name>  Switch to an existing branch before committing
   --create-branch <n>  Create a new branch (requires --base)
   --base <name>        Base branch for --create-branch
+  --local-base         If the base exists only locally, branch from it as-is
+  --push-base          If the base exists only locally, push it to origin first
   --push               Push to remote after committing
   --no-push            Do not push (default in headless mode)
   --mr / --no-mr       Create a GitLab merge request (implies --push); defaults

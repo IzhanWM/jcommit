@@ -5,7 +5,9 @@ exports.listLocalBranches = listLocalBranches;
 exports.listRemoteBranches = listRemoteBranches;
 exports.getCurrentBranch = getCurrentBranch;
 exports.switchBranch = switchBranch;
+exports.locateBaseBranch = locateBaseBranch;
 exports.createBranchFromBase = createBranchFromBase;
+exports.pushBranch = pushBranch;
 exports.getRemoteUrl = getRemoteUrl;
 exports.getRepoRoot = getRepoRoot;
 exports.localBranchExists = localBranchExists;
@@ -61,20 +63,30 @@ function switchBranch(branchName) {
     const result = runGit(['checkout', branchName], { stdio: 'inherit' });
     return result.status === 0;
 }
-function createBranchFromBase(baseBranch, newBranch) {
-    // Fetch the latest from remote base branch
-    const fetchResult = runGit(['fetch', 'origin', baseBranch], { stdio: 'inherit' });
-    if (fetchResult.status !== 0) {
-        return false;
+/**
+ * Where a base branch can be taken from. Fetches `origin/<base>` first; when the
+ * remote doesn't have it (or can't be reached) but a local branch exists, the
+ * caller has to decide how to proceed instead of silently using a local copy.
+ */
+function locateBaseBranch(baseBranch) {
+    const fetchResult = runGit(['fetch', 'origin', baseBranch]);
+    if (fetchResult.status === 0 && remoteBranchExists(baseBranch)) {
+        return { location: 'remote' };
     }
-    // Try to create branch from remote base branch first
-    let result = runGit(['branch', newBranch, `origin/${baseBranch}`], { stdio: 'inherit' });
-    if (result.status === 0) {
-        return true;
+    const notOnRemote = /couldn't find remote ref|not our ref|no such ref/i.test(fetchResult.stderr);
+    const detail = fetchResult.stderr.trim();
+    if (localBranchExists(baseBranch)) {
+        return { location: 'local-only', reason: notOnRemote ? 'not-on-remote' : 'fetch-failed', detail };
     }
-    // Fallback to local base branch if remote doesn't exist
-    result = runGit(['branch', newBranch, baseBranch], { stdio: 'inherit' });
-    return result.status === 0;
+    return { location: 'missing', detail };
+}
+/** Creates `newBranch` from `origin/<base>` (source `remote`) or the local `<base>` (source `local`). */
+function createBranchFromBase(baseBranch, newBranch, source) {
+    const startPoint = source === 'remote' ? `origin/${baseBranch}` : baseBranch;
+    return runGit(['branch', newBranch, startPoint], { stdio: 'inherit' }).status === 0;
+}
+function pushBranch(branchName) {
+    return runGit(['push', '--set-upstream', 'origin', branchName], { stdio: 'inherit' }).status === 0;
 }
 function getRemoteUrl(remote = 'origin') {
     const result = runGit(['remote', 'get-url', remote]);

@@ -8,6 +8,7 @@ exports.mainWorkflow = mainWorkflow;
 const promises_1 = __importDefault(require("readline/promises"));
 const colors_1 = require("../utils/colors");
 const git_1 = require("../utils/git");
+const baseBranch_1 = require("./baseBranch");
 const prompts_1 = require("../utils/prompts");
 const jira_1 = require("../services/jira");
 const config_1 = require("../config/config");
@@ -119,19 +120,23 @@ async function mainWorkflow(config, configPath) {
         remoteBranches.forEach((branch) => console.log(`  - ${branch}`));
         const baseBranch = await (0, prompts_1.promptInput)(rl, 'Name of the source/base branch', { required: true });
         const newBranchName = await (0, prompts_1.promptInput)(rl, 'Name for the new branch', { required: true });
-        if (!(0, git_1.createBranchFromBase)(baseBranch, newBranchName)) {
-            rl.close();
-            (0, colors_1.printError)(`Failed to create branch '${newBranchName}' from '${baseBranch}'`);
-            process.exit(1);
-        }
-        if (!(0, git_1.switchBranch)(newBranchName)) {
-            rl.close();
-            (0, colors_1.printError)(`Failed to switch to newly created branch '${newBranchName}'`);
-            process.exit(1);
-        }
+        await (0, baseBranch_1.createBranchFromBaseInteractive)(baseBranch, newBranchName, async (message) => {
+            (0, colors_1.printWarning)(message);
+            while (true) {
+                const answer = (await (0, prompts_1.promptInput)(rl, `How should '${newBranchName}' be created? [l]ocal '${baseBranch}' as-is, [p]ush '${baseBranch}' to origin first, [c]ancel`, { required: true })).toLowerCase();
+                if (answer === 'l' || answer === 'local')
+                    return 'local';
+                if (answer === 'p' || answer === 'push')
+                    return 'push';
+                if (answer === 'c' || answer === 'cancel') {
+                    rl.close();
+                    return 'cancel';
+                }
+                (0, colors_1.printWarning)('Please answer l, p or c.');
+            }
+        });
         currentBranch = newBranchName;
         baseBranchForMr = baseBranch;
-        (0, colors_1.printSuccess)(`Created and switched to branch '${newBranchName}' from '${baseBranch}'`);
     }
     else if (normalizedAction === 's' || normalizedAction === 'switch') {
         (0, colors_1.printInfo)('Available local branches:');
